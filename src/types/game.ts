@@ -7,7 +7,6 @@ export interface Entity {
 
 export interface Player extends Entity {
   speed: number;
-  lives: number;
 }
 
 export interface Alien extends Entity {

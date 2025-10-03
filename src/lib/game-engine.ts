@@ -7,7 +7,6 @@ export function createPlayer(): Player {
     width: 40,
     height: 30,
     speed: GAME_CONFIG.PLAYER_SPEED,
-    lives: 3,
   };
 }
 

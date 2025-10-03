@@ -76,9 +76,10 @@ function App() {
     setGameState(prev => ({
       ...prev,
       gameStatus: 'playing',
+      wave: prev.wave + 1,
       lives: Math.min(prev.lives + 1, 3), // Bonus life for completing wave
     }));
-    toast.success(`Wave ${gameState.wave} begins!`, {
+    toast.success(`Wave ${gameState.wave + 1} begins!`, {
       description: 'Bonus life awarded',
     });
   };

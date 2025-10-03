@@ -23,10 +23,10 @@ export function VictoryMenu({ gameState, onNextWave, onMainMenu }: VictoryMenuPr
               SCORE: {gameState.score.toLocaleString()}
             </div>
             <div className="text-lg text-secondary">
-              WAVE {gameState.wave - 1} COMPLETE
+              WAVE {gameState.wave} COMPLETE
             </div>
             <div className="text-sm text-muted-foreground">
-              Prepare for Wave {gameState.wave}
+              Prepare for Wave {gameState.wave + 1}
             </div>
           </div>
           
