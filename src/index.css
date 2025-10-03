@@ -8,27 +8,27 @@
 }
 
 :root {
-  --background: oklch(0.1 0 0);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.15 0 0);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.15 0 0);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.7 0.3 240);
-  --primary-foreground: oklch(0.95 0 0);
-  --secondary: oklch(0.65 0.25 120);
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.2 0 0);
-  --muted-foreground: oklch(0.7 0 0);
-  --accent: oklch(0.85 0.15 60);
-  --accent-foreground: oklch(0.1 0 0);
-  --destructive: oklch(0.6 0.25 0);
-  --destructive-foreground: oklch(0.95 0 0);
-  --border: oklch(0.3 0 0);
-  --input: oklch(0.25 0 0);
-  --ring: oklch(0.7 0.3 240);
+  --background: oklch(0.08 0.02 220);
+  --foreground: oklch(0.98 0.05 180);
+  --card: oklch(0.12 0.03 210);
+  --card-foreground: oklch(0.95 0.05 180);
+  --popover: oklch(0.12 0.03 210);
+  --popover-foreground: oklch(0.95 0.05 180);
+  --primary: oklch(0.75 0.25 190);
+  --primary-foreground: oklch(0.98 0.05 180);
+  --secondary: oklch(0.68 0.22 150);
+  --secondary-foreground: oklch(0.98 0.05 180);
+  --muted: oklch(0.18 0.02 210);
+  --muted-foreground: oklch(0.65 0.08 200);
+  --accent: oklch(0.82 0.18 60);
+  --accent-foreground: oklch(0.08 0.02 220);
+  --destructive: oklch(0.68 0.22 15);
+  --destructive-foreground: oklch(0.98 0.05 180);
+  --border: oklch(0.25 0.05 210);
+  --input: oklch(0.22 0.04 210);
+  --ring: oklch(0.75 0.25 190);
 
-  --radius: 0rem;
+  --radius: 0.25rem;
 }
 
 @theme {
@@ -62,24 +62,34 @@
 
 body {
   font-family: 'JetBrains Mono', monospace;
-  background: var(--background);
+  background: linear-gradient(135deg, var(--background) 0%, oklch(0.06 0.02 240) 100%);
   color: var(--foreground);
   margin: 0;
   padding: 0;
   overflow: hidden;
+  min-height: 100vh;
 }
 
 .game-canvas {
   display: block;
-  background: var(--background);
-  border: 2px solid var(--border);
+  background: linear-gradient(180deg, oklch(0.05 0.02 240) 0%, oklch(0.08 0.02 220) 50%, oklch(0.04 0.01 200) 100%);
+  border: 2px solid var(--primary);
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
+  box-shadow: 
+    0 0 20px var(--primary),
+    inset 0 0 20px oklch(0.15 0.05 190);
+  border-radius: var(--radius);
 }
 
 .retro-glow {
-  text-shadow: 0 0 10px currentColor;
+  text-shadow: 
+    0 0 5px currentColor,
+    0 0 10px currentColor,
+    0 0 15px currentColor,
+    0 0 20px currentColor;
+  animation: glow-pulse 2s ease-in-out infinite alternate;
 }
 
 .scanlines::before {
@@ -89,17 +99,156 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(transparent 50%, rgba(0, 255, 0, 0.03) 50%);
+  background: linear-gradient(
+    transparent 50%, 
+    rgba(117, 195, 255, 0.02) 50%
+  );
   background-size: 100% 4px;
   pointer-events: none;
+  border-radius: var(--radius);
+}
+
+.scanlines::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 70%,
+    oklch(0.1 0.05 190) 100%
+  );
+  pointer-events: none;
+  border-radius: var(--radius);
+}
+
+@keyframes glow-pulse {
+  from {
+    text-shadow: 
+      0 0 5px currentColor,
+      0 0 10px currentColor,
+      0 0 15px currentColor,
+      0 0 20px currentColor;
+  }
+  to {
+    text-shadow: 
+      0 0 8px currentColor,
+      0 0 16px currentColor,
+      0 0 24px currentColor,
+      0 0 32px currentColor;
+  }
 }
 
 @keyframes score-pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
+  0% { 
+    transform: scale(1);
+    filter: drop-shadow(0 0 5px var(--accent));
+  }
+  50% { 
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 15px var(--accent));
+  }
+  100% { 
+    transform: scale(1);
+    filter: drop-shadow(0 0 5px var(--accent));
+  }
 }
 
 .score-pulse {
-  animation: score-pulse 0.3s ease-out;
+  animation: score-pulse 0.4s ease-out;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.menu-fade-in {
+  animation: fade-in-up 0.6s ease-out;
+}
+
+@keyframes button-glow {
+  0% {
+    box-shadow: 0 0 10px var(--primary);
+  }
+  50% {
+    box-shadow: 
+      0 0 20px var(--primary),
+      0 0 30px var(--primary);
+  }
+  100% {
+    box-shadow: 0 0 10px var(--primary);
+  }
+}
+
+.button-glow {
+  animation: button-glow 2s ease-in-out infinite;
+}
+
+.game-container {
+  background: radial-gradient(
+    circle at 50% 50%,
+    oklch(0.1 0.03 210) 0%,
+    oklch(0.06 0.02 220) 100%
+  );
+  border-radius: calc(var(--radius) * 2);
+  padding: 1rem;
+  box-shadow: 
+    0 0 40px oklch(0.4 0.2 190),
+    inset 0 0 20px oklch(0.15 0.05 200);
+}
+
+.hud-element {
+  background: linear-gradient(135deg, var(--card) 0%, oklch(0.08 0.02 210) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px oklch(0.05 0.02 220);
+}
+
+.alien-indicator {
+  width: 8px;
+  height: 8px;
+  background: var(--destructive);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--destructive);
+  animation: alien-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes alien-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.lives-indicator {
+  filter: drop-shadow(0 0 4px var(--primary));
+}
+
+@keyframes wave-announce {
+  0% {
+    transform: scale(0.8) translateY(-20px);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.wave-announce {
+  animation: wave-announce 0.8s ease-out;
 }

@@ -100,7 +100,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
-      <div className="relative">
+      <div className="relative game-container">
         <div className="scanlines">
           <GameCanvas
             gameState={gameState}

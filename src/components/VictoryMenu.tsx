@@ -11,39 +11,74 @@ interface VictoryMenuProps {
 
 export function VictoryMenu({ gameState, onNextWave, onMainMenu }: VictoryMenuProps) {
   return (
-    <div className="absolute inset-0 bg-background/90 flex items-center justify-center">
-      <Card className="bg-card/95 border-secondary">
-        <CardContent className="p-8 text-center">
-          <h1 className="text-3xl font-bold text-secondary mb-2 retro-glow">
-            WAVE CLEARED!
-          </h1>
+    <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center">
+      <Card className="bg-card/98 border-secondary menu-fade-in game-container">
+        <CardContent className="p-10 text-center max-w-md">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-secondary mb-3 retro-glow">
+              SECTOR
+            </h1>
+            <h1 className="text-4xl font-bold text-secondary mb-4 retro-glow">
+              SECURED
+            </h1>
+            <div className="w-full h-px bg-gradient-to-r from-transparent via-secondary to-transparent mb-4"></div>
+            <p className="text-muted-foreground text-lg">
+              Outstanding work, Commander!
+            </p>
+          </div>
           
-          <div className="mb-6 space-y-2">
-            <div className="text-2xl font-bold text-accent">
-              SCORE: {gameState.score.toLocaleString()}
+          <div className="mb-8 space-y-4">
+            <div className="hud-element">
+              <div className="text-3xl font-bold text-accent retro-glow">
+                {gameState.score.toLocaleString()}
+              </div>
+              <div className="text-muted-foreground text-sm">MISSION SCORE</div>
             </div>
-            <div className="text-lg text-secondary">
-              WAVE {gameState.wave} COMPLETE
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="hud-element">
+                <div className="text-2xl font-bold text-secondary retro-glow">
+                  {gameState.wave}
+                </div>
+                <div className="text-muted-foreground text-xs">WAVE COMPLETE</div>
+              </div>
+              <div className="hud-element">
+                <div className="text-2xl font-bold text-primary retro-glow">
+                  +1
+                </div>
+                <div className="text-muted-foreground text-xs">BONUS LIFE</div>
+              </div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              Prepare for Wave {gameState.wave + 1}
+            
+            <div className="hud-element bg-secondary/10">
+              <div className="text-lg font-bold text-secondary">
+                INCOMING TRANSMISSION
+              </div>
+              <div className="text-sm text-muted-foreground mt-2">
+                Wave {gameState.wave + 1} aliens detected.<br/>
+                Reinforcements en route.
+              </div>
             </div>
           </div>
           
-          <div className="flex gap-4 justify-center">
+          <div className="flex flex-col gap-3">
             <Button 
               onClick={onNextWave}
-              className="bg-secondary hover:bg-secondary/80 text-secondary-foreground font-mono"
+              className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-mono text-lg py-3 button-glow transition-all duration-300 hover:scale-105"
             >
-              NEXT WAVE
+              ADVANCE TO WAVE {gameState.wave + 1}
             </Button>
             <Button 
               onClick={onMainMenu}
               variant="outline"
-              className="border-muted text-muted-foreground hover:bg-muted/20 font-mono"
+              className="border-muted text-muted-foreground hover:bg-muted/20 font-mono py-3 transition-all duration-300 hover:scale-105"
             >
-              MAIN MENU
+              RETURN TO BASE
             </Button>
+          </div>
+          
+          <div className="mt-6 text-xs text-muted-foreground">
+            MISSION RATING: EXCELLENT • EDF COMMAND
           </div>
         </CardContent>
       </Card>
