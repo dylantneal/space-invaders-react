@@ -16,13 +16,13 @@ export function createAlienWave(wave: number): Alien[] {
   
   for (let row = 0; row < GAME_CONFIG.ALIEN_ROWS; row++) {
     for (let col = 0; col < GAME_CONFIG.ALIEN_COLS; col++) {
-      const type = types[Math.floor(row / 2)];
+      const type = types[Math.min(Math.floor(row / 2), types.length - 1)];
       const alien: Alien = {
         x: GAME_CONFIG.ALIEN_OFFSET_X + col * GAME_CONFIG.ALIEN_SPACING,
-        y: GAME_CONFIG.ALIEN_OFFSET_Y + row * 50,
+        y: GAME_CONFIG.ALIEN_OFFSET_Y + row * 40, // Consistent row spacing
         width: 30,
         height: 20,
-        velocityX: GAME_CONFIG.ALIEN_SPEED + (wave - 1) * 0.5,
+        velocityX: GAME_CONFIG.ALIEN_SPEED + (wave - 1) * 0.2, // Gradual speed increase
         velocityY: 0,
         type,
         points: POINTS[type],
@@ -50,28 +50,33 @@ export function updatePlayer(player: Player, keys: { left: boolean; right: boole
 export function updateAliens(aliens: Alien[]): { aliens: Alien[]; shouldDrop: boolean } {
   if (aliens.length === 0) return { aliens, shouldDrop: false };
   
-  const leftmost = Math.min(...aliens.map(a => a.x));
-  const rightmost = Math.max(...aliens.map(a => a.x + a.width));
+  // First, move aliens horizontally
+  const movedAliens = aliens.map(alien => ({
+    ...alien,
+    x: alien.x + alien.velocityX,
+  }));
+  
+  const leftmost = Math.min(...movedAliens.map(a => a.x));
+  const rightmost = Math.max(...movedAliens.map(a => a.x + a.width));
   
   let shouldDrop = false;
   
+  // Check if any alien hit the edge
   if (leftmost <= 0 || rightmost >= GAME_CONFIG.CANVAS_WIDTH) {
     shouldDrop = true;
   }
   
-  const updatedAliens = aliens.map(alien => {
+  const updatedAliens = movedAliens.map(alien => {
     if (shouldDrop) {
+      // Drop down and reverse direction
       return {
         ...alien,
-        x: alien.x,
+        x: Math.max(0, Math.min(GAME_CONFIG.CANVAS_WIDTH - alien.width, alien.x)), // Keep in bounds
         y: alien.y + GAME_CONFIG.ALIEN_DROP_SPEED,
         velocityX: -alien.velocityX,
       };
     } else {
-      return {
-        ...alien,
-        x: alien.x + alien.velocityX,
-      };
+      return alien;
     }
   });
   

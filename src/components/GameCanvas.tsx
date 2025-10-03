@@ -65,6 +65,21 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
     }
   }, []);
 
+  // Separate rendering effect
+  useEffect(() => {
+    if (gameState.gameStatus !== 'playing' || !rendererRef.current) return;
+
+    rendererRef.current.clear();
+    rendererRef.current.drawStars(stars);
+    rendererRef.current.drawPlayer(player);
+    rendererRef.current.drawAliens(aliens);
+    rendererRef.current.drawBullets(bullets);
+    
+    explosions.forEach(explosion => {
+      rendererRef.current?.drawExplosion(explosion.x, explosion.y, explosion.frame);
+    });
+  }, [gameState.gameStatus, stars, player, aliens, bullets, explosions]);
+
   // Collision detection effect - runs after state updates
   useEffect(() => {
     if (gameState.gameStatus !== 'playing') return;
@@ -119,7 +134,7 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
     if (collision.checkAliensReachedBottom(aliens, GAME_CONFIG.CANVAS_HEIGHT)) {
       onGameStateChange({ gameStatus: 'gameOver' });
     }
-  }, [bullets, aliens, player, gameState, collision, onGameStateChange]);
+  }, [bullets, aliens, player, gameState.score, gameState.lives, collision, onGameStateChange]);
 
   const gameLoop = useCallback(() => {
     if (gameState.gameStatus !== 'playing') return;
@@ -135,7 +150,7 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
       lastFireTimeRef.current = now;
     }
 
-    // Update aliens and handle alien shooting
+    // Update all game entities in sequence to avoid race conditions
     setAliens(prevAliens => {
       const { aliens: updatedAliens } = updateAliens(prevAliens);
       
@@ -158,21 +173,8 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
           .filter(explosion => explosion.frame < 10)
     );
 
-    // Render current frame
-    if (rendererRef.current) {
-      rendererRef.current.clear();
-      rendererRef.current.drawStars(stars);
-      rendererRef.current.drawPlayer(player);
-      rendererRef.current.drawAliens(aliens);
-      rendererRef.current.drawBullets(bullets);
-      
-      explosions.forEach(explosion => {
-        rendererRef.current?.drawExplosion(explosion.x, explosion.y, explosion.frame);
-      });
-    }
-
     animationRef.current = requestAnimationFrame(gameLoop);
-  }, [gameState.gameStatus, keys, collision, onGameStateChange, stars, player, aliens, bullets, explosions]);
+  }, [gameState.gameStatus, keys, player]);
 
   useEffect(() => {
     if (gameState.gameStatus === 'playing') {

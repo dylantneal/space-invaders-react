@@ -36,7 +36,7 @@ export function useCollision() {
   }, [checkCollision]);
 
   const checkAliensReachedBottom = useCallback((aliens: Alien[], canvasHeight: number): boolean => {
-    return aliens.some(alien => alien.y + alien.height >= canvasHeight - 50);
+    return aliens.some(alien => alien.y + alien.height >= canvasHeight - 80); // Give more space before game over
   }, []);
 
   return {

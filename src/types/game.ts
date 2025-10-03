@@ -39,8 +39,8 @@ export const GAME_CONFIG = {
   CANVAS_HEIGHT: 600,
   PLAYER_SPEED: 5,
   BULLET_SPEED: 8,
-  ALIEN_SPEED: 1,
-  ALIEN_DROP_SPEED: 20,
+  ALIEN_SPEED: 0.8, // Slower alien movement
+  ALIEN_DROP_SPEED: 15, // Less aggressive dropping
   FIRE_RATE_LIMIT: 200, // milliseconds
   ALIEN_ROWS: 5,
   ALIEN_COLS: 11,
