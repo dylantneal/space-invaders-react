@@ -39,9 +39,10 @@ export function StartMenu({ gameState, onStartGame }: StartMenuProps) {
           
           <div className="mb-8 space-y-2 text-sm text-muted-foreground hud-element">
             <p className="text-primary font-bold mb-3">MISSION BRIEFING</p>
-            <p>← → Arrow keys to move</p>
+            <p>← → Arrow keys to move (or A/D)</p>
             <p>SPACEBAR to shoot</p>
             <p>ESC to pause mission</p>
+            <p className="text-accent text-xs">P for performance monitor</p>
             <div className="mt-4 pt-3 border-t border-border">
               <p className="text-xs">Destroy all alien forces to advance</p>
             </div>

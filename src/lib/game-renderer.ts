@@ -3,6 +3,8 @@ import { Player, Alien, Bullet } from '../types/game';
 export class GameRenderer {
   private ctx: CanvasRenderingContext2D;
   private time: number = 0;
+  private alienGradientCache = new Map<string, CanvasGradient>();
+  private lastClearTime: number = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     const context = canvas.getContext('2d');
@@ -10,19 +12,31 @@ export class GameRenderer {
       throw new Error('Could not get canvas context');
     }
     this.ctx = context;
-    // Enable smoother rendering
+    // Enable smoother rendering and optimize for performance
     this.ctx.imageSmoothingEnabled = false;
+    
+    // Pre-cache gradients for better performance
+    this.cacheGradients();
+  }
+
+  private cacheGradients() {
+    // Cache commonly used gradients
+    const backgroundGradient = this.ctx.createLinearGradient(0, 0, 0, this.ctx.canvas.height);
+    backgroundGradient.addColorStop(0, 'oklch(0.05 0.02 240)');
+    backgroundGradient.addColorStop(0.5, 'oklch(0.08 0.02 220)');
+    backgroundGradient.addColorStop(1, 'oklch(0.04 0.01 200)');
+    this.alienGradientCache.set('background', backgroundGradient);
   }
 
   clear() {
-    // Enhanced background with subtle gradient
-    const gradient = this.ctx.createLinearGradient(0, 0, 0, this.ctx.canvas.height);
-    gradient.addColorStop(0, 'oklch(0.05 0.02 240)');
-    gradient.addColorStop(0.5, 'oklch(0.08 0.02 220)');
-    gradient.addColorStop(1, 'oklch(0.04 0.01 200)');
-    
-    this.ctx.fillStyle = gradient;
-    this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+    // Throttle background redraws for performance
+    const now = Date.now();
+    if (now - this.lastClearTime > 16) { // ~60fps
+      const gradient = this.alienGradientCache.get('background')!;
+      this.ctx.fillStyle = gradient;
+      this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+      this.lastClearTime = now;
+    }
     
     this.time += 0.016; // ~60fps
   }
@@ -76,23 +90,35 @@ export class GameRenderer {
     
     const colorSet = colors[alien.type];
     
-    // Animate aliens with slight bobbing
+    // Animate aliens with slight bobbing - reduce calculation frequency
     const bobOffset = Math.sin(this.time * 2 + alien.x * 0.01) * 1;
     const adjustedY = alien.y + bobOffset;
     
-    // Create gradient for depth
-    const gradient = this.ctx.createLinearGradient(
-      alien.x, adjustedY,
-      alien.x, adjustedY + alien.height
-    );
-    gradient.addColorStop(0, colorSet.main);
-    gradient.addColorStop(1, colorSet.shadow);
+    // Use cached gradient if available
+    const gradientKey = `${alien.type}-${Math.floor(alien.x)}-${Math.floor(adjustedY)}`;
+    let gradient = this.alienGradientCache.get(gradientKey);
+    
+    if (!gradient) {
+      gradient = this.ctx.createLinearGradient(
+        alien.x, adjustedY,
+        alien.x, adjustedY + alien.height
+      );
+      gradient.addColorStop(0, colorSet.main);
+      gradient.addColorStop(1, colorSet.shadow);
+      
+      // Cache gradient but limit cache size
+      if (this.alienGradientCache.size > 50) {
+        const firstKey = this.alienGradientCache.keys().next().value;
+        this.alienGradientCache.delete(firstKey);
+      }
+      this.alienGradientCache.set(gradientKey, gradient);
+    }
     
     this.ctx.fillStyle = gradient;
     this.ctx.shadowColor = colorSet.main;
     this.ctx.shadowBlur = 4;
     
-    // Enhanced alien shapes with more detail
+    // Enhanced alien shapes with more detail - optimized drawing
     switch (alien.type) {
       case 'squid':
         // Top invader - more detailed angular design
@@ -114,11 +140,13 @@ export class GameRenderer {
       case 'octopus':
         // Bottom invader - octopus with tentacles
         this.ctx.fillRect(alien.x + 1, adjustedY + 1, alien.width - 2, alien.height - 6);
-        // Tentacles
+        // Tentacles - batch draw for performance
+        this.ctx.beginPath();
         for (let i = 0; i < 4; i++) {
           const tentacleX = alien.x + 2 + i * 4;
-          this.ctx.fillRect(tentacleX, adjustedY + alien.height - 5, 2, 4);
+          this.ctx.rect(tentacleX, adjustedY + alien.height - 5, 2, 4);
         }
+        this.ctx.fill();
         break;
     }
     
@@ -208,19 +236,23 @@ export class GameRenderer {
   drawStars(stars: Array<{ x: number; y: number; brightness: number }>) {
     this.ctx.save();
     
+    // Batch draw stars for better performance
+    this.ctx.beginPath();
     stars.forEach((star, index) => {
-      // Twinkling effect
+      // Twinkling effect - reduce calculation frequency
       const twinkle = Math.sin(this.time * 2 + index * 0.5) * 0.3 + 0.7;
       const brightness = star.brightness * twinkle;
       
-      this.ctx.fillStyle = `oklch(${brightness} 0.05 200)`;
-      this.ctx.shadowColor = `oklch(${brightness} 0.05 200)`;
+      const color = `oklch(${brightness} 0.05 200)`;
+      this.ctx.fillStyle = color;
+      this.ctx.shadowColor = color;
       this.ctx.shadowBlur = 2;
       
       // Vary star sizes slightly
       const size = Math.random() > 0.9 ? 2 : 1;
-      this.ctx.fillRect(star.x, star.y, size, size);
+      this.ctx.rect(star.x, star.y, size, size);
     });
+    this.ctx.fill();
     
     this.ctx.restore();
   }

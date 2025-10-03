@@ -6,6 +6,7 @@ import { StartMenu } from './components/StartMenu';
 import { GameOverMenu } from './components/GameOverMenu';
 import { PauseMenu } from './components/PauseMenu';
 import { VictoryMenu } from './components/VictoryMenu';
+import { PerformanceMonitor } from './components/PerformanceMonitor';
 import { Toaster } from '@/components/ui/sonner';
 import { useKeyboard } from './hooks/use-keyboard';
 import { GameState } from './types/game';
@@ -13,6 +14,7 @@ import { toast } from 'sonner';
 
 function App() {
   const [highScoreStr, setHighScoreStr] = useKV('space-invaders-high-score', '0');
+  const [showPerformanceMonitor, setShowPerformanceMonitor] = useKV('space-invaders-perf-monitor', 'false');
   const [gameState, setGameState] = useState<GameState>({
     gameStatus: 'menu',
     score: 0,
@@ -31,7 +33,12 @@ function App() {
     if (keys.escape && gameState.gameStatus === 'playing') {
       setGameState(prev => ({ ...prev, gameStatus: 'paused' }));
     }
-  }, [keys.escape, gameState.gameStatus]);
+    
+    // Debug key: P to toggle performance monitor
+    if (keys.p && gameState.gameStatus === 'menu') {
+      setShowPerformanceMonitor(prev => prev === 'true' ? 'false' : 'true');
+    }
+  }, [keys.escape, keys.p, gameState.gameStatus, setShowPerformanceMonitor]);
 
   const handleGameStateChange = (newState: Partial<GameState>) => {
     setGameState(prev => {
@@ -137,6 +144,7 @@ function App() {
         )}
       </div>
       <Toaster />
+      <PerformanceMonitor enabled={showPerformanceMonitor === 'true'} />
     </div>
   );
 }

@@ -47,6 +47,13 @@ export const GAME_CONFIG = {
   ALIEN_SPACING: 60,
   ALIEN_OFFSET_X: 50,
   ALIEN_OFFSET_Y: 80,
+  
+  // Performance optimization settings
+  MAX_BULLETS: 20, // Limit bullets for performance
+  MAX_EXPLOSIONS: 10, // Limit simultaneous explosions
+  COLLISION_CHECK_INTERVAL: 16, // ms between collision checks (~60fps)
+  RENDER_TARGET_FPS: 60,
+  STAR_COUNT: 75, // Reduced from 100 for better performance
 } as const;
 
 export const POINTS = {
