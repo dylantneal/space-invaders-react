@@ -11,8 +11,8 @@ interface VictoryMenuProps {
 
 export function VictoryMenu({ gameState, onNextWave, onMainMenu }: VictoryMenuProps) {
   return (
-    <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center">
-      <Card className="bg-card/98 border-secondary menu-fade-in game-container">
+    <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-10">
+      <Card className="bg-card/98 border-secondary menu-fade-in menu-container">
         <CardContent className="p-10 text-center max-w-md">
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-secondary mb-3 retro-glow">

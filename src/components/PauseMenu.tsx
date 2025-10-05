@@ -9,8 +9,8 @@ interface PauseMenuProps {
 
 export function PauseMenu({ onResumeGame, onMainMenu }: PauseMenuProps) {
   return (
-    <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center">
-      <Card className="bg-card/98 border-accent menu-fade-in game-container">
+    <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-10">
+      <Card className="bg-card/98 border-accent menu-fade-in menu-container">
         <CardContent className="p-10 text-center max-w-sm">
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-accent mb-4 retro-glow">

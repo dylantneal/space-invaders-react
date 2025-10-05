@@ -214,6 +214,24 @@ body {
   /* Performance optimizations */
   contain: layout style paint;
   will-change: transform;
+  position: relative;
+}
+
+.menu-container {
+  background: radial-gradient(
+    circle at 50% 50%,
+    oklch(0.1 0.03 210) 0%,
+    oklch(0.06 0.02 220) 100%
+  );
+  border-radius: calc(var(--radius) * 2);
+  padding: 1rem;
+  box-shadow: 
+    0 0 40px oklch(0.4 0.2 190),
+    inset 0 0 20px oklch(0.15 0.05 200);
+  /* Performance optimizations */
+  will-change: transform;
+  max-width: 800px;
+  width: 100%;
 }
 
 .hud-element {

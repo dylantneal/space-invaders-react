@@ -7,7 +7,7 @@ interface GameHUDProps {
 
 export function GameHUD({ gameState }: GameHUDProps) {
   return (
-    <div className="absolute top-4 left-4 right-4 flex justify-between items-start text-foreground font-mono">
+    <div className="absolute top-4 left-4 right-4 flex justify-between items-start text-foreground font-mono z-5">
       <div className="hud-element flex flex-col gap-3">
         <div className="text-sm">
           SCORE: <span className="text-accent font-bold retro-glow">{gameState.score.toLocaleString()}</span>
