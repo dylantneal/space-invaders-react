@@ -419,7 +419,7 @@ export function createBoss(wave: number): Boss {
   
   return {
     x: GAME_CONFIG.CANVAS_WIDTH / 2 - GAME_CONFIG.BOSS_WIDTH / 2,
-    y: 60,
+    y: 100,
     width: GAME_CONFIG.BOSS_WIDTH,
     height: GAME_CONFIG.BOSS_HEIGHT,
     health: baseHealth,
@@ -435,24 +435,45 @@ export function createBoss(wave: number): Boss {
 }
 
 // Update boss position and state
-export function updateBoss(boss: Boss): Boss {
-  let newX = boss.x + boss.velocityX;
+export function updateBoss(boss: Boss, playerX?: number): Boss {
+  // Calculate tracking factor based on boss level (higher level = tighter tracking)
+  // Level 1: 0.025 (lazy), Level 2: 0.04, Level 3: 0.055, etc.
+  const baseTrackingFactor = 0.01;
+  const trackingIncrease = 0.015;
+  const trackingFactor = baseTrackingFactor + (boss.bossLevel * trackingIncrease);
+  
+  // When enraged, tracking becomes much tighter
+  const effectiveTrackingFactor = boss.isEnraged ? trackingFactor * 2 : trackingFactor;
+  
+  // Calculate desired velocity toward player
   let newVelocityX = boss.velocityX;
+  
+  if (playerX !== undefined) {
+    // Calculate the center of the boss and target position
+    const bossCenterX = boss.x + boss.width / 2;
+    const targetX = playerX;
+    
+    // Determine direction to player
+    const direction = targetX > bossCenterX ? 1 : -1;
+    const maxSpeed = GAME_CONFIG.BOSS_SPEED * (1 + boss.bossLevel * 0.15);
+    const targetVelocity = direction * maxSpeed;
+    
+    // Smoothly interpolate toward target velocity (lazy tracking)
+    newVelocityX = newVelocityX + (targetVelocity - newVelocityX) * effectiveTrackingFactor;
+  }
+  
+  // Apply velocity and clamp to boundaries
+  let newX = boss.x + newVelocityX;
+  newX = Math.max(20, Math.min(GAME_CONFIG.CANVAS_WIDTH - boss.width - 20, newX));
+  
+  // Vertical movement - slight bobbing, more aggressive when enraged
   let newVelocityY = boss.velocityY;
   let newY = boss.y;
   
-  // Bounce off walls
-  if (newX <= 20 || newX + boss.width >= GAME_CONFIG.CANVAS_WIDTH - 20) {
-    newVelocityX = -boss.velocityX;
-    newX = boss.x + newVelocityX;
-  }
-  
-  // Enraged bosses have more erratic movement
-  if (boss.isEnraged) {
-    // Add slight vertical oscillation when enraged
-    newVelocityY = Math.sin(Date.now() / 200) * 0.5;
-    newY = Math.max(40, Math.min(150, boss.y + newVelocityY));
-  }
+  const bobSpeed = boss.isEnraged ? 150 : 300;
+  const bobAmount = boss.isEnraged ? 1.0 : 0.3;
+  newVelocityY = Math.sin(Date.now() / bobSpeed) * bobAmount;
+  newY = Math.max(80, Math.min(140, boss.y + newVelocityY));
   
   // Update animation frame
   const newAnimationFrame = (boss.animationFrame + 1) % 60;

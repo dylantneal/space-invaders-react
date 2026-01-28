@@ -226,10 +226,11 @@ export function GameCanvas({ gameState, onGameStateChange, onBossDefeated }: Gam
   // Initialize game when starting (only when transitioning TO 'playing')
   useEffect(() => {
     const wasPlaying = prevGameStatusRef.current === 'playing';
+    const wasPaused = prevGameStatusRef.current === 'paused';
     const isPlaying = gameState.gameStatus === 'playing';
     
-    // Only initialize when we transition TO playing, not when already playing
-    if (isPlaying && !wasPlaying) {
+    // Only initialize when we transition TO playing, not when already playing or resuming from pause
+    if (isPlaying && !wasPlaying && !wasPaused) {
       initializeGame();
     }
     
@@ -652,7 +653,8 @@ export function GameCanvas({ gameState, onGameStateChange, onBossDefeated }: Gam
     // Update boss
     setBoss(prev => {
       if (!prev) return null;
-      return updateBoss(prev);
+      const playerCenter = playerRef.current ? playerRef.current.x + playerRef.current.width / 2 : undefined;
+      return updateBoss(prev, playerCenter);
     });
     
     // Boss attacks
