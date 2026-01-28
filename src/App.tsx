@@ -178,9 +178,12 @@ function App() {
       score: prev.score + extraScore,
     }));
     
-    if (wasBossWave && powerUpRewards.length > 0) {
+    if (wasBossWave) {
+      const rewardsList = powerUpRewards.length > 0 
+        ? `Rewards: ${powerUpRewards.join(', ')}, Shields Restored!`
+        : 'Shields Restored!';
       toast.success(`Boss Defeated! Wave ${gameState.wave + 1} begins!`, {
-        description: `Rewards: ${powerUpRewards.join(', ')}`,
+        description: rewardsList,
         duration: 5000,
       });
     } else {
@@ -264,7 +267,13 @@ function App() {
       )}
       
       {gameState.gameStatus === 'paused' && (
-        <PauseMenu onResumeGame={resumeGame} onMainMenu={returnToMenu} />
+        <PauseMenu 
+          gameState={gameState}
+          onResumeGame={resumeGame} 
+          onMainMenu={returnToMenu}
+          soundEnabled={soundEnabled}
+          onToggleSound={toggleSound}
+        />
       )}
       
       {gameState.gameStatus === 'victory' && (

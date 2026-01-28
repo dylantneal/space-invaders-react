@@ -131,7 +131,7 @@ export function VictoryMenu({ gameState, onNextWave, onMainMenu, bossRewards = [
             </div>
           </div>
           
-          {wasBossWave && bossRewards.length > 0 ? (
+          {wasBossWave ? (
             <div className="mb-6 p-4 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30">
               <div className="text-amber-300 font-bold mb-2 text-center">🏆 BOSS REWARDS 🏆</div>
               <div className="grid grid-cols-2 gap-2">
@@ -143,6 +143,9 @@ export function VictoryMenu({ gameState, onNextWave, onMainMenu, bossRewards = [
                     {getRewardLabel(reward)}
                   </div>
                 ))}
+                <div className="text-sm text-amber-200 bg-slate-800/50 rounded px-2 py-1 text-center">
+                  🏰 Shields Restored
+                </div>
               </div>
             </div>
           ) : (

@@ -205,7 +205,11 @@ export function GameCanvas({ gameState, onGameStateChange, onBossDefeated }: Gam
       initialAlienCountRef.current = newAliens.length;
     }
     
-    if (gameState.wave === 1) {
+    // Create shields on wave 1, or regenerate after defeating a boss
+    const previousWave = gameState.wave - 1;
+    const cameFromBossWave = previousWave > 0 && isBossWave(previousWave);
+    
+    if (gameState.wave === 1 || cameFromBossWave) {
       setShields(createShields());
     }
     lastFireTimeRef.current = 0;
