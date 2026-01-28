@@ -10,8 +10,11 @@ import {
   updateBullets,
   createPlayerBullet,
   createAlienBullet,
+  createShields,
+  checkBulletShieldCollision,
+  damageShield,
 } from '../lib/game-engine';
-import { Player, Alien, Bullet, GameState, GAME_CONFIG } from '../types/game';
+import { Player, Alien, Bullet, Shield, GameState, GAME_CONFIG } from '../types/game';
 
 interface GameCanvasProps {
   gameState: GameState;
@@ -25,9 +28,14 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
   const lastFireTimeRef = useRef<number>(0);
   const lastAlienFireTimeRef = useRef<number>(0);
   
+  // Refs to hold latest values for the game loop (avoids stale closures)
+  const keysRef = useRef<{ left: boolean; right: boolean; space: boolean; escape: boolean; p: boolean }>({ left: false, right: false, space: false, escape: false, p: false });
+  const playerRef = useRef<Player | null>(null);
+  
   const [player, setPlayer] = useState<Player>(createPlayer);
   const [aliens, setAliens] = useState<Alien[]>([]);
   const [bullets, setBullets] = useState<Bullet[]>([]);
+  const [shields, setShields] = useState<Shield[]>([]);
   const [explosions, setExplosions] = useState<Array<{ x: number; y: number; frame: number }>>([]);
   
   // Memoize static stars to prevent recreation with reduced count
@@ -42,11 +50,24 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
   const keys = useKeyboard();
   const collision = useCollision();
 
+  // Keep refs in sync with latest values
+  useEffect(() => {
+    keysRef.current = keys;
+  }, [keys]);
+
+  useEffect(() => {
+    playerRef.current = player;
+  }, [player]);
+
   const initializeGame = useCallback(() => {
     setPlayer(createPlayer());
     setAliens(createAlienWave(gameState.wave));
     setBullets([]);
     setExplosions([]);
+    // Only create new shields on wave 1, otherwise keep existing shields
+    if (gameState.wave === 1) {
+      setShields(createShields());
+    }
     lastFireTimeRef.current = 0;
     lastAlienFireTimeRef.current = 0;
   }, [gameState.wave]);
@@ -76,10 +97,16 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
   useEffect(() => {
     if (gameState.gameStatus !== 'playing' || !rendererRef.current) return;
 
+    let renderFrameId: number;
+    let isActive = true;
+
     const render = (currentTime: number) => {
+      if (!isActive) return;
+      
       if (currentTime - lastRenderTimeRef.current >= FRAME_TIME) {
         rendererRef.current!.clear();
         rendererRef.current!.drawStars(stars);
+        rendererRef.current!.drawShields(shields);
         rendererRef.current!.drawPlayer(player);
         rendererRef.current!.drawAliens(aliens);
         rendererRef.current!.drawBullets(bullets);
@@ -91,13 +118,19 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
         lastRenderTimeRef.current = currentTime;
       }
       
-      if (gameState.gameStatus === 'playing') {
-        requestAnimationFrame(render);
+      if (isActive && gameState.gameStatus === 'playing') {
+        renderFrameId = requestAnimationFrame(render);
       }
     };
 
-    requestAnimationFrame(render);
-  }, [gameState.gameStatus, stars, player, aliens, bullets, explosions]);
+    renderFrameId = requestAnimationFrame(render);
+    
+    // Cleanup: cancel animation frame when effect re-runs or unmounts
+    return () => {
+      isActive = false;
+      cancelAnimationFrame(renderFrameId);
+    };
+  }, [gameState.gameStatus, stars, player, aliens, bullets, shields, explosions]);
 
   // Optimized collision detection with reduced frequency
   const lastCollisionCheckRef = useRef<number>(0);
@@ -109,8 +142,30 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
     if (now - lastCollisionCheckRef.current < GAME_CONFIG.COLLISION_CHECK_INTERVAL) return;
     lastCollisionCheckRef.current = now;
 
-    // Check bullet-alien collisions
-    const bulletAlienCollisions = collision.checkBulletAlienCollisions(bullets, aliens);
+    // Check bullet-shield collisions first
+    const bulletsToRemove = new Set<number>();
+    
+    bullets.forEach((bullet, bulletIndex) => {
+      for (const shield of shields) {
+        if (checkBulletShieldCollision(bullet, shield)) {
+          // Damage the shield
+          damageShield(shield, bullet.x, bullet.y, bullet.width, bullet.height, !bullet.fromPlayer);
+          bulletsToRemove.add(bulletIndex);
+          break;
+        }
+      }
+    });
+    
+    // Remove bullets that hit shields
+    if (bulletsToRemove.size > 0) {
+      setBullets(prev => prev.filter((_, index) => !bulletsToRemove.has(index)));
+      // Force shield re-render by creating new array
+      setShields(prev => [...prev]);
+    }
+
+    // Check bullet-alien collisions (only for bullets not removed by shields)
+    const remainingBullets = bullets.filter((_, index) => !bulletsToRemove.has(index));
+    const bulletAlienCollisions = collision.checkBulletAlienCollisions(remainingBullets, aliens);
     
     if (bulletAlienCollisions.length > 0) {
       const totalPoints = bulletAlienCollisions.reduce((sum, collision) => sum + collision.points, 0);
@@ -127,7 +182,7 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
       const hitBulletIndices = new Set(bulletAlienCollisions.map(c => c.bulletIndex));
       const hitAlienIndices = new Set(bulletAlienCollisions.map(c => c.alienIndex));
       
-      setBullets(prev => prev.filter((_, index) => !hitBulletIndices.has(index)));
+      setBullets(prev => prev.filter((_, index) => !hitBulletIndices.has(index) && !bulletsToRemove.has(index)));
       
       setAliens(prev => {
         const filtered = prev.filter((_, index) => !hitAlienIndices.has(index));
@@ -156,24 +211,26 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
       }
     }
     
-    // Check if aliens reached bottom
+    // Check if aliens reached bottom (shields area)
     if (collision.checkAliensReachedBottom(aliens, GAME_CONFIG.CANVAS_HEIGHT)) {
       onGameStateChange({ gameStatus: 'gameOver' });
     }
-  }, [bullets, aliens, player, gameState.score, gameState.lives, collision, onGameStateChange]);
+  }, [bullets, aliens, player, shields, gameState.score, gameState.lives, collision, onGameStateChange]);
 
   // Optimized game loop with requestAnimationFrame timing
   const gameLoop = useCallback((timestamp: number) => {
     if (gameState.gameStatus !== 'playing') return;
 
     const now = timestamp || Date.now();
+    const currentKeys = keysRef.current;
+    const currentPlayer = playerRef.current;
 
-    // Update player
-    setPlayer(prevPlayer => updatePlayer(prevPlayer, keys));
+    // Update player using ref for latest keys
+    setPlayer(prevPlayer => updatePlayer(prevPlayer, currentKeys));
 
     // Handle player shooting with rate limiting
-    if (keys.space && now - lastFireTimeRef.current > GAME_CONFIG.FIRE_RATE_LIMIT) {
-      setBullets(prevBullets => [...prevBullets, createPlayerBullet(player)]);
+    if (currentKeys.space && now - lastFireTimeRef.current > GAME_CONFIG.FIRE_RATE_LIMIT && currentPlayer) {
+      setBullets(prevBullets => [...prevBullets, createPlayerBullet(currentPlayer)]);
       lastFireTimeRef.current = now;
     }
 
@@ -218,7 +275,7 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
     });
 
     animationRef.current = requestAnimationFrame(gameLoop);
-  }, [gameState.gameStatus, keys, player]);
+  }, [gameState.gameStatus]);
 
   useEffect(() => {
     if (gameState.gameStatus === 'playing') {

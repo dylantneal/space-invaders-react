@@ -13,8 +13,8 @@ import { GameState } from './types/game';
 import { toast } from 'sonner';
 
 function App() {
-  const [highScoreStr, setHighScoreStr] = useKV('space-invaders-high-score', '0');
-  const [showPerformanceMonitor, setShowPerformanceMonitor] = useKV('space-invaders-perf-monitor', 'false');
+  const [highScoreStr, setHighScoreStr] = useKV('alien-invaders-high-score', '0');
+  const [showPerformanceMonitor, setShowPerformanceMonitor] = useKV('alien-invaders-perf-monitor', 'false');
   const [gameState, setGameState] = useState<GameState>({
     gameStatus: 'menu',
     score: 0,
@@ -84,7 +84,7 @@ function App() {
       ...prev,
       gameStatus: 'playing',
       wave: prev.wave + 1,
-      lives: Math.min(prev.lives + 1, 3), // Bonus life for completing wave
+      lives: Math.min(prev.lives + 1, 3),
     }));
     toast.success(`Wave ${gameState.wave + 1} begins!`, {
       description: 'Bonus life awarded',
@@ -106,9 +106,10 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4 relative">
+      {/* Game container with canvas */}
       <div className="relative game-container">
-        <div className="scanlines">
+        <div className="scanlines relative">
           <GameCanvas
             gameState={gameState}
             onGameStateChange={handleGameStateChange}
@@ -118,31 +119,33 @@ function App() {
         {gameState.gameStatus === 'playing' && (
           <GameHUD gameState={gameState} />
         )}
-        
-        {gameState.gameStatus === 'menu' && (
-          <StartMenu gameState={gameState} onStartGame={startGame} />
-        )}
-        
-        {gameState.gameStatus === 'gameOver' && (
-          <GameOverMenu
-            gameState={gameState}
-            onRestartGame={restartGame}
-            onMainMenu={returnToMenu}
-          />
-        )}
-        
-        {gameState.gameStatus === 'paused' && (
-          <PauseMenu onResumeGame={resumeGame} onMainMenu={returnToMenu} />
-        )}
-        
-        {gameState.gameStatus === 'victory' && (
-          <VictoryMenu
-            gameState={gameState}
-            onNextWave={nextWave}
-            onMainMenu={returnToMenu}
-          />
-        )}
       </div>
+      
+      {/* Menu overlays - positioned outside game-container to avoid styling conflicts */}
+      {gameState.gameStatus === 'menu' && (
+        <StartMenu gameState={gameState} onStartGame={startGame} />
+      )}
+      
+      {gameState.gameStatus === 'gameOver' && (
+        <GameOverMenu
+          gameState={gameState}
+          onRestartGame={restartGame}
+          onMainMenu={returnToMenu}
+        />
+      )}
+      
+      {gameState.gameStatus === 'paused' && (
+        <PauseMenu onResumeGame={resumeGame} onMainMenu={returnToMenu} />
+      )}
+      
+      {gameState.gameStatus === 'victory' && (
+        <VictoryMenu
+          gameState={gameState}
+          onNextWave={nextWave}
+          onMainMenu={returnToMenu}
+        />
+      )}
+      
       <Toaster />
       <PerformanceMonitor enabled={showPerformanceMonitor === 'true'} />
     </div>

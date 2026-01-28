@@ -9,50 +9,35 @@ interface PauseMenuProps {
 
 export function PauseMenu({ onResumeGame, onMainMenu }: PauseMenuProps) {
   return (
-    <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-10">
-      <Card className="bg-card/98 border-accent menu-fade-in menu-container">
-        <CardContent className="p-10 text-center max-w-sm">
+    <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center">
+      <Card className="relative bg-slate-900/95 border-2 border-cyan-500/50 shadow-2xl shadow-cyan-500/20 max-w-sm mx-4">
+        <CardContent className="p-8 text-center">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
+          
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-accent mb-4 retro-glow">
-              MISSION
-            </h1>
-            <h1 className="text-4xl font-bold text-accent mb-4 retro-glow">
+            <div className="text-5xl mb-4">⏸️</div>
+            <h1 className="text-4xl font-black text-cyan-400" style={{ textShadow: '0 0 30px rgba(34, 211, 238, 0.5)' }}>
               PAUSED
             </h1>
-            <div className="w-full h-px bg-gradient-to-r from-transparent via-accent to-transparent mb-4"></div>
-            <p className="text-muted-foreground">
-              Systems on standby
-            </p>
           </div>
           
-          <div className="mb-8 hud-element">
-            <div className="text-sm text-muted-foreground mb-2">MISSION STATUS</div>
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
-              <span className="text-accent font-mono">ACTIVE</span>
-              <div className="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
-            </div>
-          </div>
-          
-          <div className="flex flex-col gap-3">
+          <div className="space-y-3">
             <Button 
               onClick={onResumeGame}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-mono text-lg py-3 button-glow transition-all duration-300 hover:scale-105"
+              className="w-full py-5 text-lg font-bold bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-slate-900 shadow-lg shadow-cyan-500/30 transition-all hover:scale-105 border-0"
             >
-              RESUME MISSION
+              RESUME
             </Button>
             <Button 
               onClick={onMainMenu}
               variant="outline"
-              className="border-muted text-muted-foreground hover:bg-muted/20 font-mono py-3 transition-all duration-300 hover:scale-105"
+              className="w-full py-5 text-lg font-semibold border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white transition-all"
             >
-              ABORT MISSION
+              QUIT TO MENU
             </Button>
           </div>
           
-          <div className="mt-6 text-xs text-muted-foreground">
-            PRESS ESC TO RESUME
-          </div>
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent" />
         </CardContent>
       </Card>
     </div>

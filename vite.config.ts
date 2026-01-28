@@ -19,7 +19,10 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': resolve(projectRoot, 'src')
+      '@': resolve(projectRoot, 'src'),
+      // Vite 6 struggles with d3-time's non-standard `exports` map.
+      // Point directly at a file path to avoid package-entry resolution.
+      'd3-time': resolve(projectRoot, 'node_modules/d3-time/src/index.js'),
     }
   },
 });

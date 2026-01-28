@@ -34,6 +34,17 @@ export interface PowerUp extends Entity {
   velocityY: number;
 }
 
+
+export interface Shield {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  // Grid of pixels - true means pixel exists, false means destroyed
+  pixels: boolean[][];
+  pixelSize: number;
+}
+
 export const GAME_CONFIG = {
   CANVAS_WIDTH: 800,
   CANVAS_HEIGHT: 600,
@@ -54,6 +65,13 @@ export const GAME_CONFIG = {
   COLLISION_CHECK_INTERVAL: 16, // ms between collision checks (~60fps)
   RENDER_TARGET_FPS: 60,
   STAR_COUNT: 75, // Reduced from 100 for better performance
+  
+  // Shield configuration
+  SHIELD_COUNT: 4,
+  SHIELD_WIDTH: 60,
+  SHIELD_HEIGHT: 40,
+  SHIELD_PIXEL_SIZE: 4,
+  SHIELD_Y_POSITION: 480, // Position above player
 } as const;
 
 export const POINTS = {

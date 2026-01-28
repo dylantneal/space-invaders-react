@@ -1,10 +1,10 @@
-import { Player, Alien, Bullet } from '../types/game';
+import { Player, Alien, Bullet, Shield } from '../types/game';
 
 export class GameRenderer {
   private ctx: CanvasRenderingContext2D;
   private time: number = 0;
-  private alienGradientCache = new Map<string, CanvasGradient>();
-  private lastClearTime: number = 0;
+  private backgroundGradient: CanvasGradient | null = null;
+  private starSizes: number[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     const context = canvas.getContext('2d');
@@ -12,69 +12,56 @@ export class GameRenderer {
       throw new Error('Could not get canvas context');
     }
     this.ctx = context;
-    // Enable smoother rendering and optimize for performance
     this.ctx.imageSmoothingEnabled = false;
     
-    // Pre-cache gradients for better performance
-    this.cacheGradients();
-  }
-
-  private cacheGradients() {
-    // Cache commonly used gradients
-    const backgroundGradient = this.ctx.createLinearGradient(0, 0, 0, this.ctx.canvas.height);
-    backgroundGradient.addColorStop(0, 'oklch(0.05 0.02 240)');
-    backgroundGradient.addColorStop(0.5, 'oklch(0.08 0.02 220)');
-    backgroundGradient.addColorStop(1, 'oklch(0.04 0.01 200)');
-    this.alienGradientCache.set('background', backgroundGradient);
+    // Create background gradient matching the new slate theme
+    this.backgroundGradient = this.ctx.createLinearGradient(0, 0, 0, this.ctx.canvas.height);
+    this.backgroundGradient.addColorStop(0, '#020617');
+    this.backgroundGradient.addColorStop(0.5, '#0f172a');
+    this.backgroundGradient.addColorStop(1, '#020617');
   }
 
   clear() {
-    // Throttle background redraws for performance
-    const now = Date.now();
-    if (now - this.lastClearTime > 16) { // ~60fps
-      const gradient = this.alienGradientCache.get('background')!;
-      this.ctx.fillStyle = gradient;
+    if (this.backgroundGradient) {
+      this.ctx.fillStyle = this.backgroundGradient;
       this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
-      this.lastClearTime = now;
     }
-    
-    this.time += 0.016; // ~60fps
+    this.time += 0.016;
   }
 
   drawPlayer(player: Player) {
     this.ctx.save();
     
-    // Main ship color with glow effect
+    // Cyan gradient for player ship
     const gradient = this.ctx.createLinearGradient(
       player.x, player.y, 
       player.x, player.y + player.height
     );
-    gradient.addColorStop(0, 'oklch(0.85 0.25 190)');
-    gradient.addColorStop(1, 'oklch(0.65 0.2 180)');
+    gradient.addColorStop(0, '#22d3ee');
+    gradient.addColorStop(1, '#0891b2');
     
     this.ctx.fillStyle = gradient;
-    this.ctx.shadowColor = 'oklch(0.75 0.25 190)';
-    this.ctx.shadowBlur = 8;
+    this.ctx.shadowColor = '#22d3ee';
+    this.ctx.shadowBlur = 15;
     
-    // Enhanced ship design
+    // Main hull triangle
     this.ctx.beginPath();
-    // Main hull
     this.ctx.moveTo(player.x + player.width / 2, player.y);
     this.ctx.lineTo(player.x + 2, player.y + player.height - 3);
     this.ctx.lineTo(player.x + player.width - 2, player.y + player.height - 3);
     this.ctx.closePath();
     this.ctx.fill();
     
-    // Ship body with detail
-    this.ctx.shadowBlur = 4;
+    // Ship body
+    this.ctx.shadowBlur = 8;
     this.ctx.fillRect(player.x + 4, player.y + 12, player.width - 8, player.height - 16);
     
-    // Engine glow effect
-    this.ctx.shadowColor = 'oklch(0.82 0.18 60)';
-    this.ctx.shadowBlur = 6;
-    this.ctx.fillStyle = 'oklch(0.82 0.18 60)';
-    this.ctx.fillRect(player.x + 8, player.y + player.height - 4, 4, 2);
-    this.ctx.fillRect(player.x + player.width - 12, player.y + player.height - 4, 4, 2);
+    // Engine glow - orange accent
+    this.ctx.shadowColor = '#fb923c';
+    this.ctx.shadowBlur = 10;
+    this.ctx.fillStyle = '#fb923c';
+    this.ctx.fillRect(player.x + 8, player.y + player.height - 4, 4, 3);
+    this.ctx.fillRect(player.x + player.width - 12, player.y + player.height - 4, 4, 3);
     
     this.ctx.restore();
   }
@@ -82,71 +69,53 @@ export class GameRenderer {
   drawAlien(alien: Alien) {
     this.ctx.save();
     
+    // Updated colors to match theme
     const colors = {
-      squid: { main: 'oklch(0.85 0.18 60)', shadow: 'oklch(0.65 0.15 50)' },
-      crab: { main: 'oklch(0.68 0.22 15)', shadow: 'oklch(0.48 0.18 10)' }, 
-      octopus: { main: 'oklch(0.68 0.22 150)', shadow: 'oklch(0.48 0.18 140)' },
+      squid: { main: '#fb923c', shadow: '#ea580c', glow: '#fb923c' },    // Orange
+      crab: { main: '#f472b6', shadow: '#db2777', glow: '#f472b6' },     // Pink
+      octopus: { main: '#4ade80', shadow: '#16a34a', glow: '#4ade80' },  // Green
     };
     
     const colorSet = colors[alien.type];
+    const drawY = alien.y;
     
-    // Animate aliens with slight bobbing - reduce calculation frequency
-    const bobOffset = Math.sin(this.time * 2 + alien.x * 0.01) * 1;
-    const adjustedY = alien.y + bobOffset;
-    
-    // Use cached gradient if available
-    const gradientKey = `${alien.type}-${Math.floor(alien.x)}-${Math.floor(adjustedY)}`;
-    let gradient = this.alienGradientCache.get(gradientKey);
-    
-    if (!gradient) {
-      gradient = this.ctx.createLinearGradient(
-        alien.x, adjustedY,
-        alien.x, adjustedY + alien.height
-      );
-      gradient.addColorStop(0, colorSet.main);
-      gradient.addColorStop(1, colorSet.shadow);
-      
-      // Cache gradient but limit cache size
-      if (this.alienGradientCache.size > 50) {
-        const firstKey = this.alienGradientCache.keys().next().value;
-        this.alienGradientCache.delete(firstKey);
-      }
-      this.alienGradientCache.set(gradientKey, gradient);
-    }
+    // Create gradient
+    const gradient = this.ctx.createLinearGradient(
+      alien.x, drawY,
+      alien.x, drawY + alien.height
+    );
+    gradient.addColorStop(0, colorSet.main);
+    gradient.addColorStop(1, colorSet.shadow);
     
     this.ctx.fillStyle = gradient;
-    this.ctx.shadowColor = colorSet.main;
-    this.ctx.shadowBlur = 4;
+    this.ctx.shadowColor = colorSet.glow;
+    this.ctx.shadowBlur = 8;
     
-    // Enhanced alien shapes with more detail - optimized drawing
+    // Draw alien shapes
     switch (alien.type) {
       case 'squid':
-        // Top invader - more detailed angular design
-        this.ctx.fillRect(alien.x + 3, adjustedY + 2, alien.width - 6, alien.height - 4);
-        this.ctx.fillRect(alien.x + 1, adjustedY + 6, alien.width - 2, alien.height - 10);
+        this.ctx.fillRect(alien.x + 3, drawY + 2, alien.width - 6, alien.height - 4);
+        this.ctx.fillRect(alien.x + 1, drawY + 6, alien.width - 2, alien.height - 10);
         // Eyes
-        this.ctx.fillStyle = 'oklch(0.9 0.1 190)';
-        this.ctx.fillRect(alien.x + 4, adjustedY + 4, 2, 2);
-        this.ctx.fillRect(alien.x + alien.width - 6, adjustedY + 4, 2, 2);
+        this.ctx.fillStyle = '#fef3c7';
+        this.ctx.shadowBlur = 0;
+        this.ctx.fillRect(alien.x + 6, drawY + 5, 3, 3);
+        this.ctx.fillRect(alien.x + alien.width - 9, drawY + 5, 3, 3);
         break;
       case 'crab':
-        // Middle invader - crab-like with claws
-        this.ctx.fillRect(alien.x + 2, adjustedY + 3, alien.width - 4, alien.height - 6);
-        this.ctx.fillRect(alien.x, adjustedY + 8, alien.width, 3);
+        this.ctx.fillRect(alien.x + 2, drawY + 3, alien.width - 4, alien.height - 6);
+        this.ctx.fillRect(alien.x, drawY + 8, alien.width, 4);
         // Claws
-        this.ctx.fillRect(alien.x - 1, adjustedY + 6, 2, 4);
-        this.ctx.fillRect(alien.x + alien.width - 1, adjustedY + 6, 2, 4);
+        this.ctx.fillRect(alien.x - 2, drawY + 6, 3, 5);
+        this.ctx.fillRect(alien.x + alien.width - 1, drawY + 6, 3, 5);
         break;
       case 'octopus':
-        // Bottom invader - octopus with tentacles
-        this.ctx.fillRect(alien.x + 1, adjustedY + 1, alien.width - 2, alien.height - 6);
-        // Tentacles - batch draw for performance
-        this.ctx.beginPath();
+        this.ctx.fillRect(alien.x + 1, drawY + 1, alien.width - 2, alien.height - 6);
+        // Tentacles with rounded look
         for (let i = 0; i < 4; i++) {
-          const tentacleX = alien.x + 2 + i * 4;
-          this.ctx.rect(tentacleX, adjustedY + alien.height - 5, 2, 4);
+          const tentacleX = alien.x + 2 + i * 7;
+          this.ctx.fillRect(tentacleX, drawY + alien.height - 6, 4, 5);
         }
-        this.ctx.fill();
         break;
     }
     
@@ -157,20 +126,22 @@ export class GameRenderer {
     this.ctx.save();
     
     if (bullet.fromPlayer) {
-      // Player bullets - bright with trail effect
-      this.ctx.fillStyle = 'oklch(0.95 0.1 180)';
-      this.ctx.shadowColor = 'oklch(0.95 0.1 180)';
-      this.ctx.shadowBlur = 6;
+      // Cyan player bullets
+      this.ctx.fillStyle = '#22d3ee';
+      this.ctx.shadowColor = '#22d3ee';
+      this.ctx.shadowBlur = 10;
       
-      // Draw trail
-      this.ctx.globalAlpha = 0.3;
-      this.ctx.fillRect(bullet.x - 1, bullet.y + bullet.height, bullet.width + 2, 8);
+      // Trail effect
+      this.ctx.globalAlpha = 0.4;
+      this.ctx.fillRect(bullet.x - 1, bullet.y + bullet.height, bullet.width + 2, 12);
+      this.ctx.globalAlpha = 0.2;
+      this.ctx.fillRect(bullet.x - 1, bullet.y + bullet.height + 8, bullet.width + 2, 8);
       this.ctx.globalAlpha = 1;
     } else {
-      // Alien bullets - menacing red with glow
-      this.ctx.fillStyle = 'oklch(0.68 0.22 15)';
-      this.ctx.shadowColor = 'oklch(0.68 0.22 15)';
-      this.ctx.shadowBlur = 4;
+      // Red/orange enemy bullets
+      this.ctx.fillStyle = '#ef4444';
+      this.ctx.shadowColor = '#ef4444';
+      this.ctx.shadowBlur = 8;
     }
     
     this.ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
@@ -190,42 +161,23 @@ export class GameRenderer {
     
     const maxFrames = 10;
     const progress = frame / maxFrames;
-    const size = 8 + progress * 24;
+    const size = 10 + progress * 30;
     
-    // Multi-layered explosion effect
-    const colors = [
-      `oklch(0.95 0.1 180)`, // White core
-      `oklch(0.85 0.18 60)`, // Yellow
-      `oklch(0.68 0.22 15)`, // Orange/Red
-    ];
+    // Multi-color explosion
+    const colors = ['#fef3c7', '#fb923c', '#ef4444'];
     
-    // Draw explosion layers
     for (let layer = 0; layer < 3; layer++) {
-      const layerSize = size - layer * 6;
-      const layerAlpha = 1 - progress - layer * 0.2;
+      const layerSize = size - layer * 8;
+      const layerAlpha = (1 - progress) * (1 - layer * 0.25);
       
       if (layerSize > 0 && layerAlpha > 0) {
         this.ctx.globalAlpha = Math.max(0, layerAlpha);
         this.ctx.fillStyle = colors[layer];
         this.ctx.shadowColor = colors[layer];
-        this.ctx.shadowBlur = 8;
+        this.ctx.shadowBlur = 15;
         
-        // Create jagged explosion shape
         this.ctx.beginPath();
-        const points = 8;
-        for (let i = 0; i < points; i++) {
-          const angle = (i / points) * Math.PI * 2;
-          const radius = layerSize * (0.7 + Math.random() * 0.3);
-          const px = x + Math.cos(angle) * radius;
-          const py = y + Math.sin(angle) * radius;
-          
-          if (i === 0) {
-            this.ctx.moveTo(px, py);
-          } else {
-            this.ctx.lineTo(px, py);
-          }
-        }
-        this.ctx.closePath();
+        this.ctx.arc(x + 15, y + 10, layerSize, 0, Math.PI * 2);
         this.ctx.fill();
       }
     }
@@ -234,26 +186,45 @@ export class GameRenderer {
   }
 
   drawStars(stars: Array<{ x: number; y: number; brightness: number }>) {
+    if (this.starSizes.length !== stars.length) {
+      this.starSizes = stars.map(() => Math.random() > 0.85 ? 2 : 1);
+    }
+    
     this.ctx.save();
     
-    // Batch draw stars for better performance
-    this.ctx.beginPath();
     stars.forEach((star, index) => {
-      // Twinkling effect - reduce calculation frequency
-      const twinkle = Math.sin(this.time * 2 + index * 0.5) * 0.3 + 0.7;
-      const brightness = star.brightness * twinkle;
-      
-      const color = `oklch(${brightness} 0.05 200)`;
-      this.ctx.fillStyle = color;
-      this.ctx.shadowColor = color;
-      this.ctx.shadowBlur = 2;
-      
-      // Vary star sizes slightly
-      const size = Math.random() > 0.9 ? 2 : 1;
-      this.ctx.rect(star.x, star.y, size, size);
+      // Subtle blue-tinted stars
+      const brightness = 0.3 + star.brightness * 0.5;
+      this.ctx.fillStyle = `rgba(148, 163, 184, ${brightness})`;
+      this.ctx.fillRect(star.x, star.y, this.starSizes[index], this.starSizes[index]);
     });
-    this.ctx.fill();
     
     this.ctx.restore();
   }
+  drawShield(shield: Shield) {
+    this.ctx.save();
+    
+    // Shield color - classic green
+    this.ctx.fillStyle = '#4ade80';
+    this.ctx.shadowColor = '#4ade80';
+    this.ctx.shadowBlur = 4;
+    
+    // Draw each pixel that still exists
+    for (let row = 0; row < shield.pixels.length; row++) {
+      for (let col = 0; col < shield.pixels[row].length; col++) {
+        if (shield.pixels[row][col]) {
+          const pixelX = shield.x + col * shield.pixelSize;
+          const pixelY = shield.y + row * shield.pixelSize;
+          this.ctx.fillRect(pixelX, pixelY, shield.pixelSize - 1, shield.pixelSize - 1);
+        }
+      }
+    }
+    
+    this.ctx.restore();
+  }
+
+  drawShields(shields: Shield[]) {
+    shields.forEach(shield => this.drawShield(shield));
+  }
+
 }

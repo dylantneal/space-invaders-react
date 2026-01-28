@@ -1,4 +1,4 @@
-import { Player, Alien, Bullet, GAME_CONFIG, POINTS } from '../types/game';
+import { Player, Alien, Bullet, Shield, GAME_CONFIG, POINTS } from '../types/game';
 
 export function createPlayer(): Player {
   return {
@@ -112,4 +112,122 @@ export function createAlienBullet(alien: Alien): Bullet {
     velocityY: GAME_CONFIG.BULLET_SPEED / 2,
     fromPlayer: false,
   };
+}
+
+export function createShields(): Shield[] {
+  const shields: Shield[] = [];
+  const shieldSpacing = GAME_CONFIG.CANVAS_WIDTH / (GAME_CONFIG.SHIELD_COUNT + 1);
+  
+  for (let i = 0; i < GAME_CONFIG.SHIELD_COUNT; i++) {
+    const x = shieldSpacing * (i + 1) - GAME_CONFIG.SHIELD_WIDTH / 2;
+    const shield = createShield(x, GAME_CONFIG.SHIELD_Y_POSITION);
+    shields.push(shield);
+  }
+  
+  return shields;
+}
+
+function createShield(x: number, y: number): Shield {
+  const cols = Math.floor(GAME_CONFIG.SHIELD_WIDTH / GAME_CONFIG.SHIELD_PIXEL_SIZE);
+  const rows = Math.floor(GAME_CONFIG.SHIELD_HEIGHT / GAME_CONFIG.SHIELD_PIXEL_SIZE);
+  
+  // Create pixel grid with classic bunker shape
+  const pixels: boolean[][] = [];
+  
+  for (let row = 0; row < rows; row++) {
+    pixels[row] = [];
+    for (let col = 0; col < cols; col++) {
+      // Create bunker shape - arch at top, notch at bottom
+      const centerCol = cols / 2;
+      const distFromCenter = Math.abs(col - centerCol);
+      
+      // Top arch - curved top
+      if (row < 3) {
+        const archWidth = cols / 2 - row * 1.5;
+        pixels[row][col] = distFromCenter < archWidth;
+      }
+      // Middle section - full width
+      else if (row < rows - 3) {
+        pixels[row][col] = true;
+      }
+      // Bottom notch - opening for player to hide in
+      else {
+        const notchWidth = cols / 4;
+        pixels[row][col] = distFromCenter > notchWidth;
+      }
+    }
+  }
+  
+  return {
+    x,
+    y,
+    width: GAME_CONFIG.SHIELD_WIDTH,
+    height: GAME_CONFIG.SHIELD_HEIGHT,
+    pixels,
+    pixelSize: GAME_CONFIG.SHIELD_PIXEL_SIZE,
+  };
+}
+
+export function damageShield(shield: Shield, bulletX: number, bulletY: number, bulletWidth: number, bulletHeight: number, fromAbove: boolean): boolean {
+  // Convert bullet position to shield pixel coordinates
+  const relX = bulletX - shield.x;
+  const relY = bulletY - shield.y;
+  
+  const startCol = Math.floor(relX / shield.pixelSize);
+  const endCol = Math.floor((relX + bulletWidth) / shield.pixelSize);
+  const startRow = Math.floor(relY / shield.pixelSize);
+  const endRow = Math.floor((relY + bulletHeight) / shield.pixelSize);
+  
+  let damaged = false;
+  
+  // Damage pixels in the bullet's path
+  for (let row = startRow; row <= endRow; row++) {
+    for (let col = startCol; col <= endCol; col++) {
+      if (row >= 0 && row < shield.pixels.length && 
+          col >= 0 && col < shield.pixels[0].length) {
+        if (shield.pixels[row][col]) {
+          shield.pixels[row][col] = false;
+          damaged = true;
+          
+          // Damage a few extra pixels for more realistic erosion
+          if (fromAbove && row + 1 < shield.pixels.length) {
+            shield.pixels[row + 1][col] = false;
+          } else if (!fromAbove && row - 1 >= 0) {
+            shield.pixels[row - 1][col] = false;
+          }
+        }
+      }
+    }
+  }
+  
+  return damaged;
+}
+
+export function checkBulletShieldCollision(bullet: Bullet, shield: Shield): boolean {
+  // First check bounding box
+  if (bullet.x + bullet.width < shield.x || 
+      bullet.x > shield.x + shield.width ||
+      bullet.y + bullet.height < shield.y || 
+      bullet.y > shield.y + shield.height) {
+    return false;
+  }
+  
+  // Check if bullet hits any existing pixel
+  const relX = bullet.x - shield.x;
+  const relY = bullet.y - shield.y;
+  
+  const startCol = Math.max(0, Math.floor(relX / shield.pixelSize));
+  const endCol = Math.min(shield.pixels[0].length - 1, Math.floor((relX + bullet.width) / shield.pixelSize));
+  const startRow = Math.max(0, Math.floor(relY / shield.pixelSize));
+  const endRow = Math.min(shield.pixels.length - 1, Math.floor((relY + bullet.height) / shield.pixelSize));
+  
+  for (let row = startRow; row <= endRow; row++) {
+    for (let col = startCol; col <= endCol; col++) {
+      if (shield.pixels[row] && shield.pixels[row][col]) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
 }
