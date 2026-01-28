@@ -168,14 +168,24 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
     lastAlienFireTimeRef.current = 0;
     nextMysteryShipSpawnRef.current = getNextMysteryShipSpawnTime();
     prevMysteryShipRef.current = null;
-    prevLivesRef.current = gameState.lives;
-  }, [gameState.wave, gameState.lives]);
+    // Lives are always 3 when starting/restarting a game
+    prevLivesRef.current = 3;
+  }, [gameState.wave]);
 
-  // Initialize game when starting
+  // Track previous game status to only initialize on transition to 'playing'
+  const prevGameStatusRef = useRef<string>(gameState.gameStatus);
+
+  // Initialize game when starting (only when transitioning TO 'playing')
   useEffect(() => {
-    if (gameState.gameStatus === 'playing') {
+    const wasPlaying = prevGameStatusRef.current === 'playing';
+    const isPlaying = gameState.gameStatus === 'playing';
+    
+    // Only initialize when we transition TO playing, not when already playing
+    if (isPlaying && !wasPlaying) {
       initializeGame();
     }
+    
+    prevGameStatusRef.current = gameState.gameStatus;
   }, [gameState.gameStatus, initializeGame]);
 
   useEffect(() => {
@@ -185,6 +195,15 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
     if (!rendererRef.current) {
       rendererRef.current = new GameRenderer(canvas);
     }
+  }, []);
+
+  // Cleanup sound manager on component unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      soundManager.stopHeartbeat();
+      soundManager.stopMysteryShipSound();
+      soundManager.stopLowHealthWarning();
+    };
   }, []);
 
   // Optimized rendering with frame rate control
@@ -396,8 +415,11 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
     
     if (playerHit) {
       if (hasShield(activePowerUps)) {
-        // Shield blocked the hit - play shield sound
+        // Shield blocked the hit - consume the shield (one-hit protection)
         soundManager.play('shieldHit');
+        setActivePowerUps(prev => ({ ...prev, shield: null }));
+        // Clear enemy bullets that were about to hit (the shield absorbed them)
+        setBullets(prev => prev.filter(bullet => bullet.fromPlayer));
       } else {
         soundManager.play('playerDeath');
         const newLives = gameState.lives - 1;
