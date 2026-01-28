@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useKeyboard } from '../hooks/use-keyboard';
 import { useCollision } from '../hooks/use-collision';
 import { GameRenderer } from '../lib/game-renderer';
+import { soundManager } from '../lib/sound-manager';
 import {
   createPlayer,
   createAlienWave,
@@ -13,8 +14,24 @@ import {
   createShields,
   checkBulletShieldCollision,
   damageShield,
+  createMysteryShip,
+  updateMysteryShip,
+  getNextMysteryShipSpawnTime,
+  getInitialAlienCount,
+  calculateSpeedMultiplier,
+  createPowerUp,
+  updatePowerUps,
+  shouldDropPowerUp,
+  createInitialActivePowerUps,
+  activatePowerUp,
+  updateActivePowerUps,
+  getFireRateCooldown,
+  getScoreMultiplier,
+  hasShield,
+  hasSpreadShot,
+  createSpreadShotBullets,
 } from '../lib/game-engine';
-import { Player, Alien, Bullet, Shield, GameState, GAME_CONFIG } from '../types/game';
+import { Player, Alien, Bullet, Shield, MysteryShip, PowerUp, ActivePowerUps, GameState, GAME_CONFIG } from '../types/game';
 
 interface GameCanvasProps {
   gameState: GameState;
@@ -28,15 +45,34 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
   const lastFireTimeRef = useRef<number>(0);
   const lastAlienFireTimeRef = useRef<number>(0);
   
+  // Mystery ship timing
+  const nextMysteryShipSpawnRef = useRef<number>(0);
+  
+  // Track previous mystery ship state for sound
+  const prevMysteryShipRef = useRef<MysteryShip | null>(null);
+  
+  // Track previous lives for low health warning
+  const prevLivesRef = useRef<number>(3);
+  
+  // Initial alien count for speed calculation
+  const initialAlienCountRef = useRef<number>(getInitialAlienCount());
+  
   // Refs to hold latest values for the game loop (avoids stale closures)
   const keysRef = useRef<{ left: boolean; right: boolean; space: boolean; escape: boolean; p: boolean }>({ left: false, right: false, space: false, escape: false, p: false });
   const playerRef = useRef<Player | null>(null);
+  const mysteryShipRef = useRef<MysteryShip | null>(null);
+  const aliensRef = useRef<Alien[]>([]);
+  const activePowerUpsRef = useRef<ActivePowerUps>(createInitialActivePowerUps());
   
   const [player, setPlayer] = useState<Player>(createPlayer);
   const [aliens, setAliens] = useState<Alien[]>([]);
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const [shields, setShields] = useState<Shield[]>([]);
   const [explosions, setExplosions] = useState<Array<{ x: number; y: number; frame: number }>>([]);
+  const [mysteryShip, setMysteryShip] = useState<MysteryShip | null>(null);
+  const [mysteryShipExplosion, setMysteryShipExplosion] = useState<{ x: number; y: number; frame: number; points: number } | null>(null);
+  const [powerUps, setPowerUps] = useState<PowerUp[]>([]);
+  const [activePowerUps, setActivePowerUps] = useState<ActivePowerUps>(createInitialActivePowerUps);
   
   // Memoize static stars to prevent recreation with reduced count
   const stars = useMemo(() => 
@@ -59,18 +95,81 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
     playerRef.current = player;
   }, [player]);
 
+  useEffect(() => {
+    mysteryShipRef.current = mysteryShip;
+    
+    // Handle mystery ship sound
+    if (mysteryShip && !prevMysteryShipRef.current) {
+      soundManager.startMysteryShipSound();
+    } else if (!mysteryShip && prevMysteryShipRef.current) {
+      soundManager.stopMysteryShipSound();
+    }
+    prevMysteryShipRef.current = mysteryShip;
+  }, [mysteryShip]);
+
+  useEffect(() => {
+    aliensRef.current = aliens;
+  }, [aliens]);
+
+  useEffect(() => {
+    activePowerUpsRef.current = activePowerUps;
+  }, [activePowerUps]);
+
+  // Handle low health warning
+  useEffect(() => {
+    if (gameState.gameStatus === 'playing') {
+      if (gameState.lives === 1 && prevLivesRef.current > 1) {
+        soundManager.startLowHealthWarning();
+      } else if (gameState.lives > 1) {
+        soundManager.stopLowHealthWarning();
+      }
+    } else {
+      soundManager.stopLowHealthWarning();
+    }
+    prevLivesRef.current = gameState.lives;
+  }, [gameState.lives, gameState.gameStatus]);
+
+  // Handle game status changes for sound
+  useEffect(() => {
+    if (gameState.gameStatus === 'playing') {
+      const speedMultiplier = calculateSpeedMultiplier(
+        aliensRef.current.length || getInitialAlienCount(),
+        initialAlienCountRef.current
+      );
+      soundManager.startHeartbeat(speedMultiplier);
+    } else {
+      soundManager.stopHeartbeat();
+      soundManager.stopMysteryShipSound();
+      soundManager.stopLowHealthWarning();
+    }
+    
+    if (gameState.gameStatus === 'victory') {
+      soundManager.play('victory');
+    } else if (gameState.gameStatus === 'gameOver') {
+      soundManager.play('gameOver');
+    }
+  }, [gameState.gameStatus]);
+
   const initializeGame = useCallback(() => {
     setPlayer(createPlayer());
-    setAliens(createAlienWave(gameState.wave));
+    const newAliens = createAlienWave(gameState.wave);
+    setAliens(newAliens);
     setBullets([]);
     setExplosions([]);
-    // Only create new shields on wave 1, otherwise keep existing shields
+    setMysteryShip(null);
+    setMysteryShipExplosion(null);
+    setPowerUps([]);
+    setActivePowerUps(createInitialActivePowerUps());
+    initialAlienCountRef.current = newAliens.length;
     if (gameState.wave === 1) {
       setShields(createShields());
     }
     lastFireTimeRef.current = 0;
     lastAlienFireTimeRef.current = 0;
-  }, [gameState.wave]);
+    nextMysteryShipSpawnRef.current = getNextMysteryShipSpawnTime();
+    prevMysteryShipRef.current = null;
+    prevLivesRef.current = gameState.lives;
+  }, [gameState.wave, gameState.lives]);
 
   // Initialize game when starting
   useEffect(() => {
@@ -107,13 +206,29 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
         rendererRef.current!.clear();
         rendererRef.current!.drawStars(stars);
         rendererRef.current!.drawShields(shields);
-        rendererRef.current!.drawPlayer(player);
-        rendererRef.current!.drawAliens(aliens);
+        rendererRef.current!.drawPlayer(player, hasShield(activePowerUps));
+        rendererRef.current!.drawAliens(aliens, soundManager.alienAnimationFrame);
         rendererRef.current!.drawBullets(bullets);
+        rendererRef.current!.drawPowerUps(powerUps);
+        
+        if (mysteryShip) {
+          rendererRef.current!.drawMysteryShip(mysteryShip);
+        }
+        
+        if (mysteryShipExplosion) {
+          rendererRef.current!.drawMysteryShipExplosion(
+            mysteryShipExplosion.x,
+            mysteryShipExplosion.y,
+            mysteryShipExplosion.frame,
+            mysteryShipExplosion.points
+          );
+        }
         
         explosions.forEach(explosion => {
           rendererRef.current?.drawExplosion(explosion.x, explosion.y, explosion.frame);
         });
+        
+        rendererRef.current!.drawActivePowerUpIndicators(activePowerUps, GAME_CONFIG.CANVAS_WIDTH);
         
         lastRenderTimeRef.current = currentTime;
       }
@@ -125,12 +240,11 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
 
     renderFrameId = requestAnimationFrame(render);
     
-    // Cleanup: cancel animation frame when effect re-runs or unmounts
     return () => {
       isActive = false;
       cancelAnimationFrame(renderFrameId);
     };
-  }, [gameState.gameStatus, stars, player, aliens, bullets, shields, explosions]);
+  }, [gameState.gameStatus, stars, player, aliens, bullets, shields, explosions, mysteryShip, mysteryShipExplosion, powerUps, activePowerUps]);
 
   // Optimized collision detection with reduced frequency
   const lastCollisionCheckRef = useRef<number>(0);
@@ -148,47 +262,125 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
     bullets.forEach((bullet, bulletIndex) => {
       for (const shield of shields) {
         if (checkBulletShieldCollision(bullet, shield)) {
-          // Damage the shield
           damageShield(shield, bullet.x, bullet.y, bullet.width, bullet.height, !bullet.fromPlayer);
           bulletsToRemove.add(bulletIndex);
+          // Play shield hit sound
+          soundManager.play('shieldHit');
           break;
         }
       }
     });
     
-    // Remove bullets that hit shields
     if (bulletsToRemove.size > 0) {
       setBullets(prev => prev.filter((_, index) => !bulletsToRemove.has(index)));
-      // Force shield re-render by creating new array
       setShields(prev => [...prev]);
     }
 
-    // Check bullet-alien collisions (only for bullets not removed by shields)
+    // Check bullet-mystery ship collisions
+    if (mysteryShip && mysteryShip.active) {
+      const remainingPlayerBullets = bullets.filter((b, index) => b.fromPlayer && !bulletsToRemove.has(index));
+      
+      for (let i = 0; i < remainingPlayerBullets.length; i++) {
+        const bullet = remainingPlayerBullets[i];
+        if (collision.checkCollision(bullet, mysteryShip)) {
+          const points = mysteryShip.points * getScoreMultiplier(activePowerUps);
+          
+          soundManager.play('mysteryShipExplosion');
+          
+          setMysteryShipExplosion({
+            x: mysteryShip.x,
+            y: mysteryShip.y,
+            frame: 0,
+            points: points,
+          });
+          
+          setMysteryShip(null);
+          
+          const bulletIndex = bullets.findIndex(b => b === bullet);
+          if (bulletIndex !== -1) {
+            bulletsToRemove.add(bulletIndex);
+          }
+          
+          onGameStateChange({ score: gameState.score + points });
+          nextMysteryShipSpawnRef.current = getNextMysteryShipSpawnTime();
+          
+          break;
+        }
+      }
+    }
+    
+    if (bulletsToRemove.size > 0) {
+      setBullets(prev => prev.filter((_, index) => !bulletsToRemove.has(index)));
+    }
+
+    // Check player-powerup collisions
+    const collectedPowerUps: number[] = [];
+    powerUps.forEach((powerUp, index) => {
+      if (collision.checkCollision(player, powerUp)) {
+        collectedPowerUps.push(index);
+        soundManager.play('powerUp');
+        setActivePowerUps(prev => activatePowerUp(prev, powerUp.type));
+      }
+    });
+    
+    if (collectedPowerUps.length > 0) {
+      setPowerUps(prev => prev.filter((_, index) => !collectedPowerUps.includes(index)));
+    }
+
+    // Check bullet-alien collisions
     const remainingBullets = bullets.filter((_, index) => !bulletsToRemove.has(index));
     const bulletAlienCollisions = collision.checkBulletAlienCollisions(remainingBullets, aliens);
     
     if (bulletAlienCollisions.length > 0) {
-      const totalPoints = bulletAlienCollisions.reduce((sum, collision) => sum + collision.points, 0);
+      const scoreMultiplier = getScoreMultiplier(activePowerUps);
+      const totalPoints = bulletAlienCollisions.reduce((sum, coll) => sum + coll.points, 0) * scoreMultiplier;
       
-      // Batch explosion updates
-      const newExplosions = bulletAlienCollisions.map(collision => {
-        const alien = aliens[collision.alienIndex];
+      // Play explosion sounds with combo tracking
+      bulletAlienCollisions.forEach(() => {
+        soundManager.registerKill();
+        soundManager.play('explosion');
+      });
+      
+      // Play bigger explosion if multiple kills at once
+      if (bulletAlienCollisions.length >= 2) {
+        soundManager.play('explosionBig');
+      }
+      
+      const newExplosions = bulletAlienCollisions.map(coll => {
+        const alien = aliens[coll.alienIndex];
         return { x: alien.x, y: alien.y, frame: 0 };
       });
       
       setExplosions(prev => [...prev, ...newExplosions]);
       
-      // Remove hit bullets and aliens in one operation
       const hitBulletIndices = new Set(bulletAlienCollisions.map(c => c.bulletIndex));
       const hitAlienIndices = new Set(bulletAlienCollisions.map(c => c.alienIndex));
       
       setBullets(prev => prev.filter((_, index) => !hitBulletIndices.has(index) && !bulletsToRemove.has(index)));
       
+      // Spawn power-ups from destroyed aliens
+      const newPowerUps: PowerUp[] = [];
+      bulletAlienCollisions.forEach(coll => {
+        if (shouldDropPowerUp()) {
+          const alien = aliens[coll.alienIndex];
+          newPowerUps.push(createPowerUp(alien.x + alien.width / 2, alien.y + alien.height));
+        }
+      });
+      
+      if (newPowerUps.length > 0) {
+        setPowerUps(prev => [...prev, ...newPowerUps]);
+      }
+      
       setAliens(prev => {
         const filtered = prev.filter((_, index) => !hitAlienIndices.has(index));
         
-        // Check wave completion
+        // Update heartbeat speed based on remaining aliens
+        const newSpeedMultiplier = calculateSpeedMultiplier(filtered.length, initialAlienCountRef.current);
+        soundManager.updateHeartbeatSpeed(newSpeedMultiplier);
+        
         if (filtered.length === 0) {
+          soundManager.stopHeartbeat();
+          soundManager.stopLowHealthWarning();
           onGameStateChange({ gameStatus: 'victory' });
         }
         
@@ -199,23 +391,35 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
     }
     
     // Check player collisions
-    if (collision.checkPlayerAlienCollisions(player, aliens) || 
-        collision.checkPlayerBulletCollisions(player, bullets)) {
-      const newLives = gameState.lives - 1;
-      if (newLives <= 0) {
-        onGameStateChange({ gameStatus: 'gameOver', lives: 0 });
+    const playerHit = collision.checkPlayerAlienCollisions(player, aliens) || 
+        collision.checkPlayerBulletCollisions(player, bullets);
+    
+    if (playerHit) {
+      if (hasShield(activePowerUps)) {
+        // Shield blocked the hit - play shield sound
+        soundManager.play('shieldHit');
       } else {
-        onGameStateChange({ lives: newLives });
-        setPlayer(createPlayer());
-        setBullets(prev => prev.filter(bullet => bullet.fromPlayer));
+        soundManager.play('playerDeath');
+        const newLives = gameState.lives - 1;
+        if (newLives <= 0) {
+          soundManager.stopHeartbeat();
+          soundManager.stopLowHealthWarning();
+          onGameStateChange({ gameStatus: 'gameOver', lives: 0 });
+        } else {
+          onGameStateChange({ lives: newLives });
+          setPlayer(createPlayer());
+          setBullets(prev => prev.filter(bullet => bullet.fromPlayer));
+        }
       }
     }
     
-    // Check if aliens reached bottom (shields area)
+    // Check if aliens reached bottom
     if (collision.checkAliensReachedBottom(aliens, GAME_CONFIG.CANVAS_HEIGHT)) {
+      soundManager.stopHeartbeat();
+      soundManager.stopLowHealthWarning();
       onGameStateChange({ gameStatus: 'gameOver' });
     }
-  }, [bullets, aliens, player, shields, gameState.score, gameState.lives, collision, onGameStateChange]);
+  }, [bullets, aliens, player, shields, mysteryShip, powerUps, activePowerUps, gameState.score, gameState.lives, collision, onGameStateChange]);
 
   // Optimized game loop with requestAnimationFrame timing
   const gameLoop = useCallback((timestamp: number) => {
@@ -224,23 +428,36 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
     const now = timestamp || Date.now();
     const currentKeys = keysRef.current;
     const currentPlayer = playerRef.current;
+    const currentAliens = aliensRef.current;
+    const currentActivePowerUps = activePowerUpsRef.current;
 
-    // Update player using ref for latest keys
     setPlayer(prevPlayer => updatePlayer(prevPlayer, currentKeys));
 
     // Handle player shooting with rate limiting
-    if (currentKeys.space && now - lastFireTimeRef.current > GAME_CONFIG.FIRE_RATE_LIMIT && currentPlayer) {
-      setBullets(prevBullets => [...prevBullets, createPlayerBullet(currentPlayer)]);
+    const fireRateCooldown = getFireRateCooldown(currentActivePowerUps);
+    if (currentKeys.space && now - lastFireTimeRef.current > fireRateCooldown && currentPlayer) {
+      soundManager.play('playerShoot');
+      
+      if (hasSpreadShot(currentActivePowerUps)) {
+        const spreadBullets = createSpreadShotBullets(currentPlayer);
+        setBullets(prevBullets => [...prevBullets, ...spreadBullets]);
+      } else {
+        setBullets(prevBullets => [...prevBullets, createPlayerBullet(currentPlayer)]);
+      }
       lastFireTimeRef.current = now;
     }
 
-    // Update all game entities in sequence to avoid race conditions
+    const speedMultiplier = calculateSpeedMultiplier(
+      currentAliens.length,
+      initialAlienCountRef.current
+    );
+
     setAliens(prevAliens => {
-      const { aliens: updatedAliens } = updateAliens(prevAliens);
+      const { aliens: updatedAliens } = updateAliens(prevAliens, speedMultiplier);
       
-      // Random alien shooting using updated aliens array
       if (now - lastAlienFireTimeRef.current > 1000 && updatedAliens.length > 0) {
         const randomAlien = updatedAliens[Math.floor(Math.random() * updatedAliens.length)];
+        soundManager.play('alienShoot');
         setBullets(prevBullets => [...prevBullets, createAlienBullet(randomAlien)]);
         lastAlienFireTimeRef.current = now;
       }
@@ -248,12 +465,9 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
       return updatedAliens;
     });
 
-    // Update bullets - filter out off-screen bullets and limit count for performance
     setBullets(prevBullets => {
-      const filteredBullets = updateBullets(prevBullets)
-        .filter(bullet => bullet.y > -bullet.height && bullet.y < GAME_CONFIG.CANVAS_HEIGHT + bullet.height);
+      const filteredBullets = updateBullets(prevBullets);
       
-      // Limit bullet count for performance
       if (filteredBullets.length > GAME_CONFIG.MAX_BULLETS) {
         return filteredBullets.slice(-GAME_CONFIG.MAX_BULLETS);
       }
@@ -261,17 +475,43 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
       return filteredBullets;
     });
 
-    // Update explosions with limit
+    setPowerUps(prev => updatePowerUps(prev));
+
+    setActivePowerUps(prev => updateActivePowerUps(prev));
+
     setExplosions(prev => {
       const updated = prev.map(explosion => ({ ...explosion, frame: explosion.frame + 1 }))
         .filter(explosion => explosion.frame < 10);
       
-      // Limit explosion count for performance
       if (updated.length > GAME_CONFIG.MAX_EXPLOSIONS) {
         return updated.slice(-GAME_CONFIG.MAX_EXPLOSIONS);
       }
       
       return updated;
+    });
+
+    setMysteryShip(prev => {
+      if (prev) {
+        return updateMysteryShip(prev);
+      }
+      
+      if (Date.now() >= nextMysteryShipSpawnRef.current) {
+        nextMysteryShipSpawnRef.current = getNextMysteryShipSpawnTime();
+        return createMysteryShip();
+      }
+      
+      return null;
+    });
+
+    setMysteryShipExplosion(prev => {
+      if (!prev) return null;
+      
+      const newFrame = prev.frame + 1;
+      if (newFrame >= 20) {
+        return null;
+      }
+      
+      return { ...prev, frame: newFrame };
     });
 
     animationRef.current = requestAnimationFrame(gameLoop);
