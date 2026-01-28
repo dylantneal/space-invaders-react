@@ -119,7 +119,7 @@ export function StartMenu({ gameState, onStartGame }: StartMenuProps) {
           <div className="mt-6 flex items-center justify-center gap-4 text-xs text-slate-500">
             <span>v2.1</span>
             <span className="w-1 h-1 rounded-full bg-slate-600" />
-            <span>GALACTIC DEFENSE CORPS</span>
+            <span>DYLAN NEAL</span>
           </div>
           
           {/* Decorative bottom border glow */}
