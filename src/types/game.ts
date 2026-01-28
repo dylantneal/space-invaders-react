@@ -52,6 +52,25 @@ export interface MysteryShip extends Entity {
   active: boolean;
 }
 
+// Boss alien that appears every 5 waves
+export interface Boss extends Entity {
+  health: number;
+  maxHealth: number;
+  phase: number; // Current attack phase (1-3)
+  velocityX: number;
+  velocityY: number;
+  lastAttackTime: number;
+  animationFrame: number;
+  isEnraged: boolean; // Below 30% health
+  bossLevel: number; // Which boss (1 = wave 5, 2 = wave 10, etc.)
+}
+
+// Rewards given after defeating a boss
+export type BossReward = {
+  type: 'extraLife' | 'fullShields' | 'rapidFire' | 'spreadShot' | 'shield' | 'scoreMultiplier' | 'megaPoints';
+  value?: number;
+}
+
 export interface Shield {
   x: number;
   y: number;
@@ -109,6 +128,26 @@ export const GAME_CONFIG = {
   RAPID_FIRE_COOLDOWN: 80, // Reduced from 200ms to 80ms
   SPREAD_SHOT_ANGLE: 15, // Degrees spread for side bullets
   SCORE_MULTIPLIER: 2, // 2x score
+  
+  // Boss configuration
+  BOSS_WAVE_INTERVAL: 3, // Boss appears every 3 waves
+  BOSS_WIDTH: 120,
+  BOSS_HEIGHT: 80,
+  BOSS_BASE_HEALTH: 50, // Base health, multiplied by boss level
+  BOSS_SPEED: 1.5,
+  BOSS_ATTACK_INTERVAL: 800, // ms between attacks
+  BOSS_BULLET_SPEED: 4,
+  BOSS_ENRAGE_THRESHOLD: 0.3, // Below 30% health
+  BOSS_POINTS_BASE: 1000, // Base points, multiplied by boss level
+} as const;
+
+// Boss colors for each level
+export const BOSS_COLORS = {
+  1: { main: '#dc2626', secondary: '#991b1b', glow: '#ef4444', eye: '#fbbf24' }, // Red Destroyer
+  2: { main: '#7c3aed', secondary: '#5b21b6', glow: '#a78bfa', eye: '#22d3ee' }, // Purple Phantom
+  3: { main: '#059669', secondary: '#047857', glow: '#34d399', eye: '#f472b6' }, // Emerald Terror
+  4: { main: '#d97706', secondary: '#b45309', glow: '#fbbf24', eye: '#06b6d4' }, // Golden Fury
+  5: { main: '#0ea5e9', secondary: '#0284c7', glow: '#38bdf8', eye: '#f43f5e' }, // Azure Annihilator
 } as const;
 
 export const POINTS = {
@@ -119,6 +158,34 @@ export const POINTS = {
 
 // Mystery ship gives random bonus points
 export const MYSTERY_SHIP_POINTS = [50, 100, 150, 200, 300] as const;
+
+// Boss rewards - rewards get better with higher boss levels
+export const BOSS_REWARDS: BossReward[][] = [
+  // Boss Level 1 (Wave 5) - Basic rewards
+  [
+    { type: 'extraLife' },
+    { type: 'rapidFire' },
+    { type: 'megaPoints', value: 500 },
+  ],
+  // Boss Level 2 (Wave 10) - Better rewards
+  [
+    { type: 'extraLife' },
+    { type: 'spreadShot' },
+    { type: 'fullShields' },
+    { type: 'megaPoints', value: 1000 },
+  ],
+  // Boss Level 3+ (Wave 15+) - Best rewards
+  [
+    { type: 'extraLife' },
+    { type: 'extraLife' },
+    { type: 'rapidFire' },
+    { type: 'spreadShot' },
+    { type: 'shield' },
+    { type: 'scoreMultiplier' },
+    { type: 'fullShields' },
+    { type: 'megaPoints', value: 2000 },
+  ],
+];
 
 // Power-up colors for rendering
 export const POWERUP_COLORS = {

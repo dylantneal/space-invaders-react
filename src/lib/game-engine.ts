@@ -1,4 +1,4 @@
-import { Player, Alien, Bullet, Shield, MysteryShip, PowerUp, PowerUpType, ActivePowerUps, GAME_CONFIG, POINTS, MYSTERY_SHIP_POINTS } from '../types/game';
+import { Player, Alien, Bullet, Shield, MysteryShip, PowerUp, PowerUpType, ActivePowerUps, Boss, BossReward, GAME_CONFIG, POINTS, MYSTERY_SHIP_POINTS, BOSS_REWARDS } from '../types/game';
 
 export function createPlayer(): Player {
   return {
@@ -397,4 +397,217 @@ export function checkBulletShieldCollision(bullet: Bullet, shield: Shield): bool
   }
   
   return false;
+}
+
+// ==================== BOSS FUNCTIONS ====================
+
+// Check if current wave is a boss wave
+export function isBossWave(wave: number): boolean {
+  return wave > 0 && wave % GAME_CONFIG.BOSS_WAVE_INTERVAL === 0;
+}
+
+// Get boss level from wave number (boss 1 at wave 5, boss 2 at wave 10, etc.)
+export function getBossLevel(wave: number): number {
+  return Math.floor(wave / GAME_CONFIG.BOSS_WAVE_INTERVAL);
+}
+
+// Create a boss for the given wave
+export function createBoss(wave: number): Boss {
+  const bossLevel = getBossLevel(wave);
+  const healthMultiplier = 1 + (bossLevel - 1) * 0.5; // Each boss has 50% more health
+  const baseHealth = Math.floor(GAME_CONFIG.BOSS_BASE_HEALTH * healthMultiplier);
+  
+  return {
+    x: GAME_CONFIG.CANVAS_WIDTH / 2 - GAME_CONFIG.BOSS_WIDTH / 2,
+    y: 60,
+    width: GAME_CONFIG.BOSS_WIDTH,
+    height: GAME_CONFIG.BOSS_HEIGHT,
+    health: baseHealth,
+    maxHealth: baseHealth,
+    phase: 1,
+    velocityX: GAME_CONFIG.BOSS_SPEED * (1 + bossLevel * 0.1), // Slightly faster each level
+    velocityY: 0,
+    lastAttackTime: 0,
+    animationFrame: 0,
+    isEnraged: false,
+    bossLevel,
+  };
+}
+
+// Update boss position and state
+export function updateBoss(boss: Boss): Boss {
+  let newX = boss.x + boss.velocityX;
+  let newVelocityX = boss.velocityX;
+  let newVelocityY = boss.velocityY;
+  let newY = boss.y;
+  
+  // Bounce off walls
+  if (newX <= 20 || newX + boss.width >= GAME_CONFIG.CANVAS_WIDTH - 20) {
+    newVelocityX = -boss.velocityX;
+    newX = boss.x + newVelocityX;
+  }
+  
+  // Enraged bosses have more erratic movement
+  if (boss.isEnraged) {
+    // Add slight vertical oscillation when enraged
+    newVelocityY = Math.sin(Date.now() / 200) * 0.5;
+    newY = Math.max(40, Math.min(150, boss.y + newVelocityY));
+  }
+  
+  // Update animation frame
+  const newAnimationFrame = (boss.animationFrame + 1) % 60;
+  
+  // Check if boss should become enraged
+  const healthRatio = boss.health / boss.maxHealth;
+  const isEnraged = healthRatio <= GAME_CONFIG.BOSS_ENRAGE_THRESHOLD;
+  
+  // Update phase based on health
+  let phase = 1;
+  if (healthRatio <= 0.3) phase = 3;
+  else if (healthRatio <= 0.6) phase = 2;
+  
+  return {
+    ...boss,
+    x: newX,
+    y: newY,
+    velocityX: newVelocityX,
+    velocityY: newVelocityY,
+    animationFrame: newAnimationFrame,
+    isEnraged,
+    phase,
+  };
+}
+
+// Damage the boss and return updated boss (or null if destroyed)
+export function damageBoss(boss: Boss, damage: number = 1): Boss | null {
+  const newHealth = boss.health - damage;
+  if (newHealth <= 0) {
+    return null; // Boss destroyed
+  }
+  return {
+    ...boss,
+    health: newHealth,
+  };
+}
+
+// Create boss bullets based on attack pattern and phase
+export function createBossBullets(boss: Boss): Bullet[] {
+  const bullets: Bullet[] = [];
+  const centerX = boss.x + boss.width / 2;
+  const bottomY = boss.y + boss.height;
+  
+  // Attack patterns become more aggressive with phase
+  switch (boss.phase) {
+    case 1:
+      // Phase 1: Single aimed shot
+      bullets.push({
+        x: centerX - 3,
+        y: bottomY,
+        width: 6,
+        height: 12,
+        velocityY: GAME_CONFIG.BOSS_BULLET_SPEED,
+        velocityX: 0,
+        fromPlayer: false,
+      });
+      break;
+      
+    case 2:
+      // Phase 2: Triple spread shot
+      for (let i = -1; i <= 1; i++) {
+        bullets.push({
+          x: centerX - 3 + i * 20,
+          y: bottomY,
+          width: 6,
+          height: 12,
+          velocityY: GAME_CONFIG.BOSS_BULLET_SPEED,
+          velocityX: i * 1.5,
+          fromPlayer: false,
+        });
+      }
+      break;
+      
+    case 3:
+      // Phase 3: Five-way spread + faster
+      for (let i = -2; i <= 2; i++) {
+        bullets.push({
+          x: centerX - 3 + i * 15,
+          y: bottomY,
+          width: 6,
+          height: 12,
+          velocityY: GAME_CONFIG.BOSS_BULLET_SPEED * 1.2,
+          velocityX: i * 2,
+          fromPlayer: false,
+        });
+      }
+      break;
+  }
+  
+  // Enraged bosses fire additional side shots
+  if (boss.isEnraged) {
+    bullets.push({
+      x: boss.x,
+      y: boss.y + boss.height / 2,
+      width: 6,
+      height: 8,
+      velocityY: 2,
+      velocityX: -3,
+      fromPlayer: false,
+    });
+    bullets.push({
+      x: boss.x + boss.width,
+      y: boss.y + boss.height / 2,
+      width: 6,
+      height: 8,
+      velocityY: 2,
+      velocityX: 3,
+      fromPlayer: false,
+    });
+  }
+  
+  return bullets;
+}
+
+// Get attack interval based on boss state (faster when enraged)
+export function getBossAttackInterval(boss: Boss): number {
+  let interval = GAME_CONFIG.BOSS_ATTACK_INTERVAL;
+  
+  // Faster attacks in higher phases
+  interval -= (boss.phase - 1) * 100;
+  
+  // Even faster when enraged
+  if (boss.isEnraged) {
+    interval *= 0.6;
+  }
+  
+  // Slightly faster for higher level bosses
+  interval -= (boss.bossLevel - 1) * 50;
+  
+  return Math.max(300, interval); // Minimum 300ms between attacks
+}
+
+// Calculate points for defeating a boss
+export function getBossPoints(boss: Boss): number {
+  return GAME_CONFIG.BOSS_POINTS_BASE * boss.bossLevel;
+}
+
+// Get rewards for defeating a boss
+export function getBossRewards(bossLevel: number): BossReward[] {
+  // Determine which reward tier to use
+  let rewardTier: number;
+  if (bossLevel <= 1) {
+    rewardTier = 0;
+  } else if (bossLevel <= 2) {
+    rewardTier = 1;
+  } else {
+    rewardTier = 2;
+  }
+  
+  const availableRewards = BOSS_REWARDS[rewardTier];
+  
+  // Give more rewards for higher level bosses
+  const numRewards = Math.min(2 + Math.floor(bossLevel / 2), availableRewards.length);
+  
+  // Shuffle and pick rewards
+  const shuffled = [...availableRewards].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, numRewards);
 }

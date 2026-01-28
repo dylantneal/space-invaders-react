@@ -15,7 +15,13 @@ type SoundType =
   | 'victory'
   | 'gameOver'
   | 'comboHit'
-  | 'lowHealth';
+  | 'lowHealth'
+  | 'bossAppear'
+  | 'bossHit'
+  | 'bossAttack'
+  | 'bossEnraged'
+  | 'bossDefeated'
+  | 'bossReward';
 
 export class SoundManager {
   private audioContext: AudioContext | null = null;
@@ -187,6 +193,12 @@ export class SoundManager {
       case 'gameOver': this.playGameOver(); break;
       case 'comboHit': this.playComboHit(); break;
       case 'lowHealth': this.playLowHealthBeep(); break;
+      case 'bossAppear': this.playBossAppear(); break;
+      case 'bossHit': this.playBossHit(); break;
+      case 'bossAttack': this.playBossAttack(); break;
+      case 'bossEnraged': this.playBossEnraged(); break;
+      case 'bossDefeated': this.playBossDefeated(); break;
+      case 'bossReward': this.playBossReward(); break;
     }
   }
   
@@ -721,6 +733,291 @@ export class SoundManager {
       
       osc.start(startTime);
       osc.stop(startTime + note.duration);
+    });
+  }
+  
+  // ==================== BOSS SOUNDS ====================
+  
+  private playBossAppear() {
+    const ctx = this.audioContext!;
+    
+    // Dramatic rising tone with sub-bass
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(50, ctx.currentTime);
+    osc1.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.8);
+    
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(25, ctx.currentTime);
+    osc2.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.8);
+    
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.4, ctx.currentTime + 0.6);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.0);
+    
+    osc1.connect(gain);
+    osc2.connect(gain);
+    this.connectWithReverb(gain, 0.6, 0.4);
+    
+    osc1.start(ctx.currentTime);
+    osc2.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 1.0);
+    osc2.stop(ctx.currentTime + 1.0);
+    
+    // Warning siren effect
+    for (let i = 0; i < 3; i++) {
+      const siren = ctx.createOscillator();
+      const sirenGain = ctx.createGain();
+      const startTime = ctx.currentTime + 0.2 + i * 0.25;
+      
+      siren.type = 'square';
+      siren.frequency.setValueAtTime(400, startTime);
+      siren.frequency.linearRampToValueAtTime(600, startTime + 0.125);
+      siren.frequency.linearRampToValueAtTime(400, startTime + 0.25);
+      
+      sirenGain.gain.setValueAtTime(0, startTime);
+      sirenGain.gain.linearRampToValueAtTime(0.15, startTime + 0.05);
+      sirenGain.gain.linearRampToValueAtTime(0, startTime + 0.2);
+      
+      siren.connect(sirenGain);
+      sirenGain.connect(this.masterGain!);
+      
+      siren.start(startTime);
+      siren.stop(startTime + 0.25);
+    }
+  }
+  
+  private playBossHit() {
+    const ctx = this.audioContext!;
+    
+    // Metallic clang
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.1);
+    
+    filter.type = 'bandpass';
+    filter.frequency.value = 1200;
+    filter.Q.value = 5;
+    
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain!);
+    
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.15);
+    
+    // Impact thud
+    if (this.noiseBufferShort) {
+      const noise = ctx.createBufferSource();
+      noise.buffer = this.noiseBufferShort;
+      
+      const noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = 'lowpass';
+      noiseFilter.frequency.value = 300;
+      
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.15, ctx.currentTime);
+      noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+      
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(this.masterGain!);
+      
+      noise.start(ctx.currentTime);
+      noise.stop(ctx.currentTime + 0.1);
+    }
+  }
+  
+  private playBossAttack() {
+    const ctx = this.audioContext!;
+    
+    // Heavy laser/cannon sound
+    const osc = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    
+    lfo.type = 'sine';
+    lfo.frequency.value = 20;
+    lfoGain.gain.value = 50;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+    
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(300, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.2);
+    
+    osc2.type = 'square';
+    osc2.frequency.setValueAtTime(150, ctx.currentTime);
+    osc2.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.2);
+    
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+    
+    osc.connect(gain);
+    osc2.connect(gain);
+    this.connectWithReverb(gain, 0.7, 0.3);
+    
+    lfo.start(ctx.currentTime);
+    osc.start(ctx.currentTime);
+    osc2.start(ctx.currentTime);
+    lfo.stop(ctx.currentTime + 0.25);
+    osc.stop(ctx.currentTime + 0.25);
+    osc2.stop(ctx.currentTime + 0.25);
+  }
+  
+  private playBossEnraged() {
+    const ctx = this.audioContext!;
+    
+    // Angry roar/growl effect
+    if (this.noiseBufferLong) {
+      const noise = ctx.createBufferSource();
+      noise.buffer = this.noiseBufferLong;
+      
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(200, ctx.currentTime);
+      filter.frequency.linearRampToValueAtTime(800, ctx.currentTime + 0.3);
+      filter.frequency.linearRampToValueAtTime(150, ctx.currentTime + 0.6);
+      
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.4, ctx.currentTime + 0.4);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.7);
+      
+      noise.connect(filter);
+      filter.connect(gain);
+      this.connectWithReverb(gain, 0.5, 0.5);
+      
+      noise.start(ctx.currentTime);
+      noise.stop(ctx.currentTime + 0.7);
+    }
+    
+    // Low frequency pulse
+    const osc = ctx.createOscillator();
+    const oscGain = ctx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(40, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(80, ctx.currentTime + 0.3);
+    osc.frequency.linearRampToValueAtTime(30, ctx.currentTime + 0.6);
+    
+    oscGain.gain.setValueAtTime(0, ctx.currentTime);
+    oscGain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 0.1);
+    oscGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.7);
+    
+    osc.connect(oscGain);
+    oscGain.connect(this.masterGain!);
+    
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.7);
+  }
+  
+  private playBossDefeated() {
+    const ctx = this.audioContext!;
+    
+    // Epic explosion sequence
+    if (this.noiseBufferLong) {
+      // Multiple layered explosions
+      for (let i = 0; i < 4; i++) {
+        const noise = ctx.createBufferSource();
+        noise.buffer = this.noiseBufferLong;
+        
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        const startTime = ctx.currentTime + i * 0.15;
+        filter.frequency.setValueAtTime(2000 - i * 300, startTime);
+        filter.frequency.exponentialRampToValueAtTime(50, startTime + 0.4);
+        
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.5 - i * 0.08, startTime + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.5);
+        
+        noise.connect(filter);
+        filter.connect(gain);
+        this.connectWithReverb(gain, 0.5, 0.5);
+        
+        noise.start(startTime);
+        noise.stop(startTime + 0.5);
+      }
+    }
+    
+    // Victory fanfare after explosion
+    const fanfare = [
+      { freq: 523.25, time: 0.7, duration: 0.15 },
+      { freq: 659.25, time: 0.85, duration: 0.15 },
+      { freq: 783.99, time: 1.0, duration: 0.15 },
+      { freq: 1046.50, time: 1.15, duration: 0.4 },
+    ];
+    
+    fanfare.forEach(note => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const startTime = ctx.currentTime + note.time;
+      
+      osc.type = 'square';
+      osc.frequency.value = note.freq;
+      
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.2, startTime + 0.02);
+      gain.gain.setValueAtTime(0.2, startTime + note.duration - 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.01, startTime + note.duration);
+      
+      osc.connect(gain);
+      this.connectWithReverb(gain, 0.6, 0.4);
+      
+      osc.start(startTime);
+      osc.stop(startTime + note.duration);
+    });
+  }
+  
+  private playBossReward() {
+    const ctx = this.audioContext!;
+    
+    // Magical reward collection sound
+    const notes = [659.25, 783.99, 987.77, 1174.66, 1318.51, 1567.98];
+    
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const startTime = ctx.currentTime + i * 0.08;
+      
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      osc2.type = 'triangle';
+      osc2.frequency.value = freq * 2;
+      
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.2, startTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.25);
+      
+      const gain2 = ctx.createGain();
+      gain2.gain.value = 0.15;
+      osc2.connect(gain2);
+      gain2.connect(gain);
+      
+      osc.connect(gain);
+      this.connectWithReverb(gain, 0.5, 0.5);
+      
+      osc.start(startTime);
+      osc2.start(startTime);
+      osc.stop(startTime + 0.25);
+      osc2.stop(startTime + 0.25);
     });
   }
   

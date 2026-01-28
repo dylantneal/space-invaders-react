@@ -9,7 +9,8 @@ import { VictoryMenu } from './components/VictoryMenu';
 import { PerformanceMonitor } from './components/PerformanceMonitor';
 import { Toaster } from '@/components/ui/sonner';
 import { useKeyboard } from './hooks/use-keyboard';
-import { GameState } from './types/game';
+import { GameState, BossReward, GAME_CONFIG } from './types/game';
+import { isBossWave } from './lib/game-engine';
 import { toast } from 'sonner';
 import { soundManager } from './lib/sound-manager';
 
@@ -29,6 +30,10 @@ function App() {
   const highScoreNotifiedRef = useRef(false);
   // Store the original high score at the start of the game to compare against
   const originalHighScoreRef = useRef(parseInt(highScoreStr || '0'));
+  
+  // Boss rewards to be applied on next wave
+  const [pendingBossRewards, setPendingBossRewards] = useState<BossReward[]>([]);
+  const [lastDefeatedBossLevel, setLastDefeatedBossLevel] = useState<number>(0);
 
   const soundEnabled = soundEnabledStr === 'true';
 
@@ -123,15 +128,66 @@ function App() {
   };
 
   const nextWave = () => {
+    // Check if there are pending boss rewards to apply
+    let extraLives = 0;
+    let extraScore = 0;
+    const powerUpRewards: string[] = [];
+    
+    if (pendingBossRewards.length > 0) {
+      // Apply boss rewards
+      pendingBossRewards.forEach(reward => {
+        switch (reward.type) {
+          case 'extraLife':
+            extraLives += 1;
+            powerUpRewards.push('Extra Life');
+            break;
+          case 'megaPoints':
+            extraScore += reward.value || 0;
+            powerUpRewards.push(`+${reward.value} Points`);
+            break;
+          case 'rapidFire':
+            powerUpRewards.push('Rapid Fire');
+            break;
+          case 'spreadShot':
+            powerUpRewards.push('Spread Shot');
+            break;
+          case 'shield':
+            powerUpRewards.push('Shield');
+            break;
+          case 'scoreMultiplier':
+            powerUpRewards.push('Score Multiplier');
+            break;
+          case 'fullShields':
+            powerUpRewards.push('Full Shields Restored');
+            break;
+        }
+      });
+      
+      // Clear pending rewards
+      setPendingBossRewards([]);
+    }
+    
+    const wasBossWave = isBossWave(gameState.wave);
+    const normalBonus = wasBossWave ? 0 : 1; // Regular waves give 1 life, boss waves give rewards instead
+    
     setGameState(prev => ({
       ...prev,
       gameStatus: 'playing',
       wave: prev.wave + 1,
-      lives: Math.min(prev.lives + 1, 3),
+      lives: Math.min(prev.lives + normalBonus + extraLives, 5), // Max 5 lives
+      score: prev.score + extraScore,
     }));
-    toast.success(`Wave ${gameState.wave + 1} begins!`, {
-      description: 'Bonus life awarded',
-    });
+    
+    if (wasBossWave && powerUpRewards.length > 0) {
+      toast.success(`Boss Defeated! Wave ${gameState.wave + 1} begins!`, {
+        description: `Rewards: ${powerUpRewards.join(', ')}`,
+        duration: 5000,
+      });
+    } else {
+      toast.success(`Wave ${gameState.wave + 1} begins!`, {
+        description: 'Bonus life awarded',
+      });
+    }
   };
 
   const returnToMenu = () => {
@@ -149,6 +205,11 @@ function App() {
 
   const resumeGame = () => {
     setGameState(prev => ({ ...prev, gameStatus: 'playing' }));
+  };
+
+  const handleBossDefeated = (rewards: BossReward[], bossLevel: number) => {
+    setPendingBossRewards(rewards);
+    setLastDefeatedBossLevel(bossLevel);
   };
 
   return (
@@ -180,6 +241,7 @@ function App() {
           <GameCanvas
             gameState={gameState}
             onGameStateChange={handleGameStateChange}
+            onBossDefeated={handleBossDefeated}
           />
         </div>
         
@@ -210,6 +272,8 @@ function App() {
           gameState={gameState}
           onNextWave={nextWave}
           onMainMenu={returnToMenu}
+          bossRewards={pendingBossRewards}
+          bossLevel={lastDefeatedBossLevel}
         />
       )}
       

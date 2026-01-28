@@ -30,15 +30,25 @@ import {
   hasShield,
   hasSpreadShot,
   createSpreadShotBullets,
+  // Boss functions
+  isBossWave,
+  createBoss,
+  updateBoss,
+  damageBoss,
+  createBossBullets,
+  getBossAttackInterval,
+  getBossPoints,
+  getBossRewards,
 } from '../lib/game-engine';
-import { Player, Alien, Bullet, Shield, MysteryShip, PowerUp, ActivePowerUps, GameState, GAME_CONFIG } from '../types/game';
+import { Player, Alien, Bullet, Shield, MysteryShip, PowerUp, ActivePowerUps, Boss, BossReward, GameState, GAME_CONFIG } from '../types/game';
 
 interface GameCanvasProps {
   gameState: GameState;
   onGameStateChange: (newState: Partial<GameState>) => void;
+  onBossDefeated?: (rewards: BossReward[], bossLevel: number) => void;
 }
 
-export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
+export function GameCanvas({ gameState, onGameStateChange, onBossDefeated }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<GameRenderer | null>(null);
   const animationRef = useRef<number>(0);
@@ -73,6 +83,14 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
   const [mysteryShipExplosion, setMysteryShipExplosion] = useState<{ x: number; y: number; frame: number; points: number } | null>(null);
   const [powerUps, setPowerUps] = useState<PowerUp[]>([]);
   const [activePowerUps, setActivePowerUps] = useState<ActivePowerUps>(createInitialActivePowerUps);
+  
+  // Boss state
+  const [boss, setBoss] = useState<Boss | null>(null);
+  const [bossExplosion, setBossExplosion] = useState<{ x: number; y: number; width: number; height: number; frame: number; bossLevel: number } | null>(null);
+  const [pendingBossRewards, setPendingBossRewards] = useState<BossReward[]>([]);
+  const bossRef = useRef<Boss | null>(null);
+  const lastBossAttackTimeRef = useRef<number>(0);
+  const bossWasEnragedRef = useRef<boolean>(false);
   
   // Memoize static stars to prevent recreation with reduced count
   const stars = useMemo(() => 
@@ -115,19 +133,20 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
     activePowerUpsRef.current = activePowerUps;
   }, [activePowerUps]);
 
-  // Handle low health warning
   useEffect(() => {
-    if (gameState.gameStatus === 'playing') {
-      if (gameState.lives === 1 && prevLivesRef.current > 1) {
-        soundManager.startLowHealthWarning();
-      } else if (gameState.lives > 1) {
-        soundManager.stopLowHealthWarning();
-      }
-    } else {
-      soundManager.stopLowHealthWarning();
+    bossRef.current = boss;
+    
+    // Play enraged sound when boss becomes enraged
+    if (boss && boss.isEnraged && !bossWasEnragedRef.current) {
+      soundManager.play('bossEnraged');
     }
+    bossWasEnragedRef.current = boss?.isEnraged ?? false;
+  }, [boss]);
+
+  // Track previous lives (keeping ref for other uses)
+  useEffect(() => {
     prevLivesRef.current = gameState.lives;
-  }, [gameState.lives, gameState.gameStatus]);
+  }, [gameState.lives]);
 
   // Handle game status changes for sound
   useEffect(() => {
@@ -152,15 +171,40 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
 
   const initializeGame = useCallback(() => {
     setPlayer(createPlayer());
-    const newAliens = createAlienWave(gameState.wave);
-    setAliens(newAliens);
     setBullets([]);
     setExplosions([]);
     setMysteryShip(null);
     setMysteryShipExplosion(null);
     setPowerUps([]);
     setActivePowerUps(createInitialActivePowerUps());
-    initialAlienCountRef.current = newAliens.length;
+    setBossExplosion(null);
+    setPendingBossRewards([]);
+    
+    // Check if this is a boss wave
+    if (isBossWave(gameState.wave)) {
+      // Boss wave - no regular aliens
+      setAliens([]);
+      const newBoss = createBoss(gameState.wave);
+      setBoss(newBoss);
+      bossRef.current = newBoss;
+      lastBossAttackTimeRef.current = 0;
+      bossWasEnragedRef.current = false;
+      initialAlienCountRef.current = 1; // For speed calculation purposes
+      
+      // Play boss appear sound
+      soundManager.play('bossAppear');
+      
+      // Stop regular heartbeat for boss waves
+      soundManager.stopHeartbeat();
+    } else {
+      // Regular wave - normal aliens
+      const newAliens = createAlienWave(gameState.wave);
+      setAliens(newAliens);
+      setBoss(null);
+      bossRef.current = null;
+      initialAlienCountRef.current = newAliens.length;
+    }
+    
     if (gameState.wave === 1) {
       setShields(createShields());
     }
@@ -247,6 +291,23 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
           rendererRef.current?.drawExplosion(explosion.x, explosion.y, explosion.frame);
         });
         
+        // Draw boss
+        if (boss) {
+          rendererRef.current!.drawBoss(boss);
+        }
+        
+        // Draw boss explosion
+        if (bossExplosion) {
+          rendererRef.current!.drawBossExplosion(
+            bossExplosion.x,
+            bossExplosion.y,
+            bossExplosion.width,
+            bossExplosion.height,
+            bossExplosion.frame,
+            bossExplosion.bossLevel
+          );
+        }
+        
         rendererRef.current!.drawActivePowerUpIndicators(activePowerUps, GAME_CONFIG.CANVAS_WIDTH);
         
         lastRenderTimeRef.current = currentTime;
@@ -263,7 +324,7 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
       isActive = false;
       cancelAnimationFrame(renderFrameId);
     };
-  }, [gameState.gameStatus, stars, player, aliens, bullets, shields, explosions, mysteryShip, mysteryShipExplosion, powerUps, activePowerUps]);
+  }, [gameState.gameStatus, stars, player, aliens, bullets, shields, explosions, mysteryShip, mysteryShipExplosion, powerUps, activePowerUps, boss, bossExplosion]);
 
   // Optimized collision detection with reduced frequency
   const lastCollisionCheckRef = useRef<number>(0);
@@ -324,6 +385,54 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
           nextMysteryShipSpawnRef.current = getNextMysteryShipSpawnTime();
           
           break;
+        }
+      }
+    }
+    
+    // Check bullet-boss collisions
+    if (boss) {
+      const remainingPlayerBullets = bullets.filter((b, index) => b.fromPlayer && !bulletsToRemove.has(index));
+      
+      for (let i = 0; i < remainingPlayerBullets.length; i++) {
+        const bullet = remainingPlayerBullets[i];
+        if (collision.checkCollision(bullet, boss)) {
+          const bulletIndex = bullets.findIndex(b => b === bullet);
+          if (bulletIndex !== -1) {
+            bulletsToRemove.add(bulletIndex);
+          }
+          
+          soundManager.play('bossHit');
+          
+          // Damage the boss
+          const updatedBoss = damageBoss(boss, 1);
+          
+          if (updatedBoss === null) {
+            // Boss defeated!
+            soundManager.play('bossDefeated');
+            
+            const bossPoints = getBossPoints(boss) * getScoreMultiplier(activePowerUps);
+            onGameStateChange({ score: gameState.score + bossPoints });
+            
+            // Start boss explosion
+            setBossExplosion({
+              x: boss.x,
+              y: boss.y,
+              width: boss.width,
+              height: boss.height,
+              frame: 0,
+              bossLevel: boss.bossLevel,
+            });
+            
+            // Get rewards
+            const rewards = getBossRewards(boss.bossLevel);
+            setPendingBossRewards(rewards);
+            
+            setBoss(null);
+          } else {
+            setBoss(updatedBoss);
+          }
+          
+          break; // Only one bullet hits per frame
         }
       }
     }
@@ -441,7 +550,7 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
       soundManager.stopLowHealthWarning();
       onGameStateChange({ gameStatus: 'gameOver' });
     }
-  }, [bullets, aliens, player, shields, mysteryShip, powerUps, activePowerUps, gameState.score, gameState.lives, collision, onGameStateChange]);
+  }, [bullets, aliens, player, shields, mysteryShip, powerUps, activePowerUps, boss, gameState.score, gameState.lives, collision, onGameStateChange]);
 
   // Optimized game loop with requestAnimationFrame timing
   const gameLoop = useCallback((timestamp: number) => {
@@ -536,8 +645,46 @@ export function GameCanvas({ gameState, onGameStateChange }: GameCanvasProps) {
       return { ...prev, frame: newFrame };
     });
 
+    // Update boss
+    setBoss(prev => {
+      if (!prev) return null;
+      return updateBoss(prev);
+    });
+    
+    // Boss attacks
+    const currentBoss = bossRef.current;
+    if (currentBoss) {
+      const attackInterval = getBossAttackInterval(currentBoss);
+      if (now - lastBossAttackTimeRef.current > attackInterval) {
+        soundManager.play('bossAttack');
+        const bossBullets = createBossBullets(currentBoss);
+        setBullets(prevBullets => [...prevBullets, ...bossBullets]);
+        lastBossAttackTimeRef.current = now;
+      }
+    }
+    
+    // Update boss explosion
+    setBossExplosion(prev => {
+      if (!prev) return null;
+      
+      const newFrame = prev.frame + 1;
+      if (newFrame >= 40) {
+        // Boss explosion done - give rewards and trigger victory
+        const rewards = pendingBossRewards;
+        if (rewards.length > 0 && onBossDefeated) {
+          onBossDefeated(rewards, prev.bossLevel);
+        }
+        setPendingBossRewards([]);
+        soundManager.play('bossReward');
+        onGameStateChange({ gameStatus: 'victory' });
+        return null;
+      }
+      
+      return { ...prev, frame: newFrame };
+    });
+
     animationRef.current = requestAnimationFrame(gameLoop);
-  }, [gameState.gameStatus]);
+  }, [gameState.gameStatus, onGameStateChange, onBossDefeated, pendingBossRewards]);
 
   useEffect(() => {
     if (gameState.gameStatus === 'playing') {
