@@ -9,9 +9,11 @@ interface PauseMenuProps {
   onMainMenu: () => void;
   soundEnabled: boolean;
   onToggleSound: () => void;
+  musicEnabled: boolean;
+  onToggleMusic: () => void;
 }
 
-export function PauseMenu({ gameState, onResumeGame, onMainMenu, soundEnabled, onToggleSound }: PauseMenuProps) {
+export function PauseMenu({ gameState, onResumeGame, onMainMenu, soundEnabled, onToggleSound, musicEnabled, onToggleMusic }: PauseMenuProps) {
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center">
       {/* Background particles */}
@@ -109,16 +111,41 @@ export function PauseMenu({ gameState, onResumeGame, onMainMenu, soundEnabled, o
             </div>
           </div>
           
-          {/* Sound Toggle */}
-          <button
-            onClick={onToggleSound}
-            className="w-full mb-6 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:bg-slate-700/50 transition-colors flex items-center justify-between"
-          >
-            <span className="text-slate-400 text-sm">Sound Effects</span>
-            <div className={`w-12 h-6 rounded-full p-1 transition-colors ${soundEnabled ? 'bg-cyan-500' : 'bg-slate-600'}`}>
-              <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${soundEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
-            </div>
-          </button>
+          {/* Audio Toggles */}
+          <div className="space-y-2 mb-6">
+            <button
+              onClick={onToggleSound}
+              className="w-full p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:bg-slate-700/50 transition-colors flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                </svg>
+                <span className="text-slate-400 text-sm">Sound Effects</span>
+              </div>
+              <div className={`w-12 h-6 rounded-full p-1 transition-colors ${soundEnabled ? 'bg-cyan-500' : 'bg-slate-600'}`}>
+                <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${soundEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+              </div>
+            </button>
+            
+            <button
+              onClick={onToggleMusic}
+              className="w-full p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:bg-slate-700/50 transition-colors flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
+                  <path d="M9 18V5l12-2v13" />
+                  <circle cx="6" cy="18" r="3" />
+                  <circle cx="18" cy="16" r="3" />
+                </svg>
+                <span className="text-slate-400 text-sm">Music</span>
+              </div>
+              <div className={`w-12 h-6 rounded-full p-1 transition-colors ${musicEnabled ? 'bg-cyan-500' : 'bg-slate-600'}`}>
+                <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${musicEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+              </div>
+            </button>
+          </div>
           
           {/* Action Buttons */}
           <div className="space-y-3">

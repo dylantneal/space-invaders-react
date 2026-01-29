@@ -25,4 +25,7 @@ export default defineConfig({
       'd3-time': resolve(projectRoot, 'node_modules/d3-time/src/index.js'),
     }
   },
+  server: {
+    port: 5001,
+  },
 });
