@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useKV } from '@github/spark/hooks';
+import { useLocalStorageString } from './hooks/use-local-storage';
 import { GameCanvas } from './components/GameCanvas';
 import { GameHUD } from './components/GameHUD';
 import { StartMenu } from './components/StartMenu';
@@ -16,9 +16,9 @@ import { soundManager } from './lib/sound-manager';
 import { musicManager } from './lib/music-manager';
 
 function App() {
-  const [highScoreStr, setHighScoreStr] = useKV('alien-invaders-high-score', '0');
-  const [showPerformanceMonitor, setShowPerformanceMonitor] = useKV('alien-invaders-perf-monitor', 'false');
-  const [soundEnabledStr, setSoundEnabledStr] = useKV('alien-invaders-sound', 'true');
+  const [highScoreStr, setHighScoreStr] = useLocalStorageString('alien-invaders-high-score', '0');
+  const [showPerformanceMonitor, setShowPerformanceMonitor] = useLocalStorageString('alien-invaders-perf-monitor', 'false');
+  const [soundEnabledStr, setSoundEnabledStr] = useLocalStorageString('alien-invaders-sound', 'true');
   const [gameState, setGameState] = useState<GameState>({
     gameStatus: 'menu',
     score: 0,
