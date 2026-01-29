@@ -13,6 +13,7 @@ import { GameState, BossReward, GAME_CONFIG } from './types/game';
 import { isBossWave } from './lib/game-engine';
 import { toast } from 'sonner';
 import { soundManager } from './lib/sound-manager';
+import { musicManager } from './lib/music-manager';
 
 function App() {
   const [highScoreStr, setHighScoreStr] = useKV('alien-invaders-high-score', '0');
@@ -42,7 +43,30 @@ function App() {
   // Sync sound manager with stored preference
   useEffect(() => {
     soundManager.setEnabled(soundEnabled);
+    musicManager.setEnabled(soundEnabled);
   }, [soundEnabled]);
+
+  // Track previous game status for music control
+  const prevGameStatusForMusicRef = useRef<string>(gameState.gameStatus);
+
+  // Control music based on game status
+  useEffect(() => {
+    const wasStatus = prevGameStatusForMusicRef.current;
+    prevGameStatusForMusicRef.current = gameState.gameStatus;
+    
+    if (gameState.gameStatus === 'playing') {
+      // If resuming from pause, don't restart music (resumeGame handles it)
+      if (wasStatus === 'paused') {
+        return;
+      }
+      // Play gameplay music for all waves (including boss)
+      musicManager.playGameplayMusic();
+    } else if (gameState.gameStatus === 'paused') {
+      musicManager.pause();
+    } else if (gameState.gameStatus === 'menu' || gameState.gameStatus === 'gameOver' || gameState.gameStatus === 'victory') {
+      musicManager.stop();
+    }
+  }, [gameState.gameStatus, gameState.wave]);
 
   useEffect(() => {
     const newHighScore = parseInt(highScoreStr || '0');
@@ -90,6 +114,7 @@ function App() {
     const newValue = !soundEnabled;
     setSoundEnabledStr(newValue ? 'true' : 'false');
     soundManager.setEnabled(newValue);
+    musicManager.setEnabled(newValue);
     
     // Play a test sound when enabling
     if (newValue) {
@@ -207,6 +232,7 @@ function App() {
   };
 
   const resumeGame = () => {
+    musicManager.resume();
     setGameState(prev => ({ ...prev, gameStatus: 'playing' }));
   };
 
