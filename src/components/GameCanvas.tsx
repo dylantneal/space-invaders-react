@@ -67,6 +67,10 @@ export function GameCanvas({ gameState, onGameStateChange, onBossDefeated }: Gam
   // Initial alien count for speed calculation
   const initialAlienCountRef = useRef<number>(getInitialAlienCount());
   
+  // Frame rate limiting for game logic (ensures consistent speed regardless of display refresh rate)
+  const lastGameUpdateRef = useRef<number>(0);
+  const GAME_UPDATE_INTERVAL = 1000 / 60; // Target 60 updates per second
+  
   // Refs to hold latest values for the game loop (avoids stale closures)
   const keysRef = useRef<{ left: boolean; right: boolean; space: boolean; escape: boolean; p: boolean }>({ left: false, right: false, space: false, escape: false, p: false });
   const playerRef = useRef<Player | null>(null);
@@ -564,6 +568,16 @@ export function GameCanvas({ gameState, onGameStateChange, onBossDefeated }: Gam
     if (gameState.gameStatus !== 'playing') return;
 
     const now = timestamp || Date.now();
+    
+    // Frame rate limiting: skip update if not enough time has passed
+    // This ensures consistent game speed regardless of display refresh rate (60Hz, 120Hz, 144Hz, etc.)
+    const timeSinceLastUpdate = now - lastGameUpdateRef.current;
+    if (timeSinceLastUpdate < GAME_UPDATE_INTERVAL) {
+      animationRef.current = requestAnimationFrame(gameLoop);
+      return;
+    }
+    lastGameUpdateRef.current = now;
+    
     const currentKeys = keysRef.current;
     const currentPlayer = playerRef.current;
     const currentAliens = aliensRef.current;
