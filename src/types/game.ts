@@ -87,7 +87,7 @@ export const GAME_CONFIG = {
   PLAYER_SPEED: 5,
   BULLET_SPEED: 8,
   ALIEN_SPEED: 0.8, // Slower alien movement
-  ALIEN_DROP_SPEED: 15, // Less aggressive dropping
+  ALIEN_DROP_SPEED: 10, // Less aggressive dropping
   FIRE_RATE_LIMIT: 200, // milliseconds
   ALIEN_ROWS: 5,
   ALIEN_COLS: 11,
@@ -96,7 +96,7 @@ export const GAME_CONFIG = {
   ALIEN_OFFSET_Y: 80,
   
   // Performance optimization settings
-  MAX_BULLETS: 30, // Increased for spread shot
+  MAX_BULLETS: 100, // Increased for boss rapid fire attacks
   MAX_EXPLOSIONS: 10, // Limit simultaneous explosions
   COLLISION_CHECK_INTERVAL: 16, // ms between collision checks (~60fps)
   RENDER_TARGET_FPS: 60,
@@ -131,8 +131,8 @@ export const GAME_CONFIG = {
   
   // Boss configuration
   BOSS_WAVE_INTERVAL: 3, // Boss appears every 3 waves
-  BOSS_WIDTH: 120,
-  BOSS_HEIGHT: 80,
+  BOSS_WIDTH: 160,
+  BOSS_HEIGHT: 110,
   BOSS_BASE_HEALTH: 50, // Base health, multiplied by boss level
   BOSS_SPEED: 1.5,
   BOSS_ATTACK_INTERVAL: 800, // ms between attacks
@@ -148,6 +148,7 @@ export const BOSS_COLORS = {
   3: { main: '#059669', secondary: '#047857', glow: '#34d399', eye: '#f472b6' }, // Emerald Terror
   4: { main: '#d97706', secondary: '#b45309', glow: '#fbbf24', eye: '#06b6d4' }, // Golden Fury
   5: { main: '#0ea5e9', secondary: '#0284c7', glow: '#38bdf8', eye: '#f43f5e' }, // Azure Annihilator
+  6: { main: '#ffffff', secondary: '#e0e0e0', glow: '#ff00ff', eye: '#00ffff' }, // VOID EMPEROR - Ultimate Boss (Wave 12)
 } as const;
 
 export const POINTS = {
@@ -161,20 +162,20 @@ export const MYSTERY_SHIP_POINTS = [50, 100, 150, 200, 300] as const;
 
 // Boss rewards - rewards get better with higher boss levels
 export const BOSS_REWARDS: BossReward[][] = [
-  // Boss Level 1 (Wave 5) - Basic rewards
+  // Boss Level 1 (Wave 3) - Basic rewards
   [
     { type: 'extraLife' },
     { type: 'rapidFire' },
     { type: 'megaPoints', value: 500 },
   ],
-  // Boss Level 2 (Wave 10) - Better rewards
+  // Boss Level 2 (Wave 6) - Better rewards
   [
     { type: 'extraLife' },
     { type: 'spreadShot' },
     { type: 'fullShields' },
     { type: 'megaPoints', value: 1000 },
   ],
-  // Boss Level 3+ (Wave 15+) - Best rewards
+  // Boss Level 3 (Wave 9) - Good rewards
   [
     { type: 'extraLife' },
     { type: 'extraLife' },
@@ -185,6 +186,38 @@ export const BOSS_REWARDS: BossReward[][] = [
     { type: 'fullShields' },
     { type: 'megaPoints', value: 2000 },
   ],
+  // Boss Level 4 (Wave 12 - normally, but redirected to VOID EMPEROR)
+  [
+    { type: 'extraLife' },
+    { type: 'extraLife' },
+    { type: 'rapidFire' },
+    { type: 'spreadShot' },
+    { type: 'fullShields' },
+    { type: 'megaPoints', value: 2500 },
+  ],
+  // Boss Level 5 (Wave 15+)
+  [
+    { type: 'extraLife' },
+    { type: 'extraLife' },
+    { type: 'rapidFire' },
+    { type: 'spreadShot' },
+    { type: 'shield' },
+    { type: 'scoreMultiplier' },
+    { type: 'fullShields' },
+    { type: 'megaPoints', value: 3000 },
+  ],
+  // VOID EMPEROR (Wave 12 Ultimate Boss - Boss Level 6) - LEGENDARY REWARDS
+  [
+    { type: 'extraLife' },
+    { type: 'extraLife' },
+    { type: 'extraLife' },
+    { type: 'rapidFire' },
+    { type: 'spreadShot' },
+    { type: 'shield' },
+    { type: 'scoreMultiplier' },
+    { type: 'fullShields' },
+    { type: 'megaPoints', value: 10000 },
+  ],
 ];
 
 // Power-up colors for rendering
@@ -194,3 +227,69 @@ export const POWERUP_COLORS = {
   shield: { main: '#06b6d4', glow: '#22d3ee' },         // Cyan
   scoreMultiplier: { main: '#10b981', glow: '#34d399' }, // Emerald/Green
 } as const;
+
+// Alien wave themes - different visual styles for each wave cycle
+// Themes cycle every 2 waves (boss waves are wave 3, 6, 9, etc.)
+export type AlienTheme = 'classic' | 'ice' | 'inferno' | 'toxic' | 'cosmic' | 'shadow';
+
+export const ALIEN_THEMES: Record<AlienTheme, {
+  squid: { main: string; shadow: string; glow: string };
+  crab: { main: string; shadow: string; glow: string };
+  octopus: { main: string; shadow: string; glow: string };
+  name: string;
+}> = {
+  classic: {
+    squid: { main: '#fb923c', shadow: '#ea580c', glow: '#fb923c' },     // Orange
+    crab: { main: '#f472b6', shadow: '#db2777', glow: '#f472b6' },      // Pink
+    octopus: { main: '#4ade80', shadow: '#16a34a', glow: '#4ade80' },   // Green
+    name: 'Classic Invaders',
+  },
+  ice: {
+    squid: { main: '#38bdf8', shadow: '#0284c7', glow: '#38bdf8' },     // Sky blue
+    crab: { main: '#818cf8', shadow: '#4f46e5', glow: '#818cf8' },      // Indigo
+    octopus: { main: '#22d3ee', shadow: '#0891b2', glow: '#22d3ee' },   // Cyan
+    name: 'Frost Legion',
+  },
+  inferno: {
+    squid: { main: '#f87171', shadow: '#dc2626', glow: '#f87171' },     // Red
+    crab: { main: '#fb923c', shadow: '#ea580c', glow: '#fb923c' },      // Orange
+    octopus: { main: '#fbbf24', shadow: '#d97706', glow: '#fbbf24' },   // Amber
+    name: 'Inferno Swarm',
+  },
+  toxic: {
+    squid: { main: '#a3e635', shadow: '#65a30d', glow: '#a3e635' },     // Lime
+    crab: { main: '#4ade80', shadow: '#16a34a', glow: '#4ade80' },      // Green
+    octopus: { main: '#2dd4bf', shadow: '#0d9488', glow: '#2dd4bf' },   // Teal
+    name: 'Toxic Horde',
+  },
+  cosmic: {
+    squid: { main: '#c084fc', shadow: '#9333ea', glow: '#c084fc' },     // Purple
+    crab: { main: '#f472b6', shadow: '#db2777', glow: '#f472b6' },      // Pink
+    octopus: { main: '#818cf8', shadow: '#4f46e5', glow: '#818cf8' },   // Indigo
+    name: 'Cosmic Terrors',
+  },
+  shadow: {
+    squid: { main: '#94a3b8', shadow: '#475569', glow: '#94a3b8' },     // Slate
+    crab: { main: '#a1a1aa', shadow: '#52525b', glow: '#a1a1aa' },      // Zinc
+    octopus: { main: '#d4d4d8', shadow: '#71717a', glow: '#d4d4d8' },   // Gray
+    name: 'Shadow Fleet',
+  },
+} as const;
+
+// Get theme based on wave number
+export function getWaveTheme(wave: number): AlienTheme {
+  const themes: AlienTheme[] = ['classic', 'ice', 'inferno', 'toxic', 'cosmic', 'shadow'];
+  // Boss waves are 3, 6, 9, etc. - we want themes for waves 1-2, 4-5, 7-8, etc.
+  // Calculate which "theme cycle" we're in (0 = waves 1-2, 1 = waves 4-5, etc.)
+  const bossInterval = 3;
+  const cycle = Math.floor((wave - 1) / bossInterval);
+  return themes[cycle % themes.length];
+}
+
+// Alien sprite variant - determines which shape variant to use
+export type AlienVariant = 0 | 1 | 2;
+
+// Get variant based on wave - cycles through 3 variants
+export function getWaveVariant(wave: number): AlienVariant {
+  return (Math.floor((wave - 1) / 3) % 3) as AlienVariant;
+}

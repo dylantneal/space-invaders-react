@@ -22,7 +22,7 @@ export function createAlienWave(wave: number): Alien[] {
         y: GAME_CONFIG.ALIEN_OFFSET_Y + row * 40,
         width: 30,
         height: 20,
-        velocityX: GAME_CONFIG.ALIEN_SPEED + (wave - 1) * 0.2,
+        velocityX: GAME_CONFIG.ALIEN_SPEED + (wave - 1) * 0.12,
         velocityY: 0,
         type,
         points: POINTS[type],
@@ -414,23 +414,34 @@ export function getBossLevel(wave: number): number {
 // Create a boss for the given wave
 export function createBoss(wave: number): Boss {
   const bossLevel = getBossLevel(wave);
-  const healthMultiplier = 1 + (bossLevel - 1) * 0.5; // Each boss has 50% more health
+  
+  // Wave 12 is the ULTIMATE BOSS - VOID EMPEROR
+  const isUltimateBoss = wave === 12;
+  
+  // Ultimate boss has 3x health and starts faster
+  const healthMultiplier = isUltimateBoss 
+    ? 3.5  // Void Emperor has massive health
+    : 1 + (bossLevel - 1) * 0.5; // Each normal boss has 50% more health
   const baseHealth = Math.floor(GAME_CONFIG.BOSS_BASE_HEALTH * healthMultiplier);
   
+  // Ultimate boss is larger
+  const bossWidth = isUltimateBoss ? GAME_CONFIG.BOSS_WIDTH * 1.3 : GAME_CONFIG.BOSS_WIDTH;
+  const bossHeight = isUltimateBoss ? GAME_CONFIG.BOSS_HEIGHT * 1.2 : GAME_CONFIG.BOSS_HEIGHT;
+  
   return {
-    x: GAME_CONFIG.CANVAS_WIDTH / 2 - GAME_CONFIG.BOSS_WIDTH / 2,
-    y: 100,
-    width: GAME_CONFIG.BOSS_WIDTH,
-    height: GAME_CONFIG.BOSS_HEIGHT,
+    x: GAME_CONFIG.CANVAS_WIDTH / 2 - bossWidth / 2,
+    y: isUltimateBoss ? 80 : 100, // Ultimate boss sits higher
+    width: bossWidth,
+    height: bossHeight,
     health: baseHealth,
     maxHealth: baseHealth,
     phase: 1,
-    velocityX: GAME_CONFIG.BOSS_SPEED * (1 + bossLevel * 0.1), // Slightly faster each level
+    velocityX: GAME_CONFIG.BOSS_SPEED * (isUltimateBoss ? 2.0 : 1 + bossLevel * 0.1), // Ultimate boss is fast
     velocityY: 0,
     lastAttackTime: 0,
     animationFrame: 0,
     isEnraged: false,
-    bossLevel,
+    bossLevel: isUltimateBoss ? 6 : bossLevel, // Use special color index 6 for ultimate boss
   };
 }
 
@@ -517,7 +528,143 @@ export function createBossBullets(boss: Boss): Bullet[] {
   const centerX = boss.x + boss.width / 2;
   const bottomY = boss.y + boss.height;
   
-  // Attack patterns become more aggressive with phase
+  // VOID EMPEROR (boss level 6) has devastating unique attacks
+  const isVoidEmperor = boss.bossLevel === 6;
+  
+  if (isVoidEmperor) {
+    // Void Emperor has brutal attack patterns in every phase
+    switch (boss.phase) {
+      case 1:
+        // Phase 1: Triple helix pattern
+        for (let i = -1; i <= 1; i++) {
+          bullets.push({
+            x: centerX - 3 + i * 25,
+            y: bottomY,
+            width: 8,
+            height: 14,
+            velocityY: GAME_CONFIG.BOSS_BULLET_SPEED * 1.3,
+            velocityX: i * 2,
+            fromPlayer: false,
+          });
+        }
+        // Plus side shots
+        bullets.push({
+          x: boss.x + 20,
+          y: bottomY - 20,
+          width: 6,
+          height: 10,
+          velocityY: GAME_CONFIG.BOSS_BULLET_SPEED,
+          velocityX: -2,
+          fromPlayer: false,
+        });
+        bullets.push({
+          x: boss.x + boss.width - 20,
+          y: bottomY - 20,
+          width: 6,
+          height: 10,
+          velocityY: GAME_CONFIG.BOSS_BULLET_SPEED,
+          velocityX: 2,
+          fromPlayer: false,
+        });
+        break;
+        
+      case 2:
+        // Phase 2: Seven-way barrage
+        for (let i = -3; i <= 3; i++) {
+          bullets.push({
+            x: centerX - 3 + i * 18,
+            y: bottomY,
+            width: 8,
+            height: 14,
+            velocityY: GAME_CONFIG.BOSS_BULLET_SPEED * 1.4,
+            velocityX: i * 1.8,
+            fromPlayer: false,
+          });
+        }
+        break;
+        
+      case 3:
+        // Phase 3: VOID STORM - Nine-way devastation + homing-like spread
+        for (let i = -4; i <= 4; i++) {
+          bullets.push({
+            x: centerX - 3 + i * 14,
+            y: bottomY,
+            width: 8,
+            height: 14,
+            velocityY: GAME_CONFIG.BOSS_BULLET_SPEED * 1.5,
+            velocityX: i * 2.2,
+            fromPlayer: false,
+          });
+        }
+        // Additional vertical pillars
+        bullets.push({
+          x: boss.x + 30,
+          y: bottomY,
+          width: 10,
+          height: 20,
+          velocityY: GAME_CONFIG.BOSS_BULLET_SPEED * 1.8,
+          velocityX: 0,
+          fromPlayer: false,
+        });
+        bullets.push({
+          x: boss.x + boss.width - 40,
+          y: bottomY,
+          width: 10,
+          height: 20,
+          velocityY: GAME_CONFIG.BOSS_BULLET_SPEED * 1.8,
+          velocityX: 0,
+          fromPlayer: false,
+        });
+        break;
+    }
+    
+    // Void Emperor ALWAYS fires side lasers
+    bullets.push({
+      x: boss.x - 5,
+      y: boss.y + boss.height / 2,
+      width: 8,
+      height: 10,
+      velocityY: 3,
+      velocityX: -4,
+      fromPlayer: false,
+    });
+    bullets.push({
+      x: boss.x + boss.width + 5,
+      y: boss.y + boss.height / 2,
+      width: 8,
+      height: 10,
+      velocityY: 3,
+      velocityX: 4,
+      fromPlayer: false,
+    });
+    
+    // When enraged, Void Emperor fires even more
+    if (boss.isEnraged) {
+      // Diagonal death rays
+      bullets.push({
+        x: boss.x + 15,
+        y: boss.y + boss.height - 10,
+        width: 10,
+        height: 10,
+        velocityY: 5,
+        velocityX: -5,
+        fromPlayer: false,
+      });
+      bullets.push({
+        x: boss.x + boss.width - 15,
+        y: boss.y + boss.height - 10,
+        width: 10,
+        height: 10,
+        velocityY: 5,
+        velocityX: 5,
+        fromPlayer: false,
+      });
+    }
+    
+    return bullets;
+  }
+  
+  // Normal boss attack patterns
   switch (boss.phase) {
     case 1:
       // Phase 1: Single aimed shot

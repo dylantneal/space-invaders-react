@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { GameState } from '../types/game';
@@ -8,34 +8,278 @@ interface StartMenuProps {
   onStartGame: () => void;
 }
 
+// Alien sprite component using CSS/SVG
+function AlienSprite({ type, x, y, size, animationDelay, duration }: { 
+  type: 'squid' | 'crab' | 'octopus';
+  x: number;
+  y: number;
+  size: number;
+  animationDelay: number;
+  duration: number;
+}) {
+  const colors = {
+    squid: { main: '#fb923c', glow: 'rgba(251, 146, 60, 0.6)' },
+    crab: { main: '#f472b6', glow: 'rgba(244, 114, 182, 0.6)' },
+    octopus: { main: '#4ade80', glow: 'rgba(74, 222, 128, 0.6)' },
+  };
+
+  const color = colors[type];
+
+  return (
+    <div
+      className="absolute pointer-events-none"
+      style={{
+        left: `${x}%`,
+        top: `${y}%`,
+        width: size,
+        height: size,
+        animation: `float ${duration}s ease-in-out infinite, bob ${2 + Math.random()}s ease-in-out infinite`,
+        animationDelay: `${animationDelay}s`,
+        filter: `drop-shadow(0 0 ${size / 3}px ${color.glow})`,
+        opacity: 0.7,
+      }}
+    >
+      <svg viewBox="0 0 32 32" width={size} height={size}>
+        {type === 'squid' && (
+          <g fill={color.main}>
+            {/* Body dome */}
+            <rect x="10" y="4" width="12" height="6" rx="1" />
+            <rect x="6" y="6" width="20" height="8" rx="1" />
+            <rect x="4" y="10" width="24" height="4" />
+            {/* Tentacles */}
+            <rect x="2" y="14" width="4" height="6" rx="1">
+              <animate attributeName="y" values="14;16;14" dur="0.5s" repeatCount="indefinite" />
+            </rect>
+            <rect x="8" y="14" width="4" height="8" rx="1">
+              <animate attributeName="height" values="8;6;8" dur="0.6s" repeatCount="indefinite" />
+            </rect>
+            <rect x="14" y="14" width="4" height="6" rx="1" />
+            <rect x="20" y="14" width="4" height="8" rx="1">
+              <animate attributeName="height" values="8;6;8" dur="0.6s" repeatCount="indefinite" />
+            </rect>
+            <rect x="26" y="14" width="4" height="6" rx="1">
+              <animate attributeName="y" values="14;16;14" dur="0.5s" repeatCount="indefinite" />
+            </rect>
+            {/* Eyes */}
+            <rect x="10" y="8" width="3" height="3" fill="#fef3c7" />
+            <rect x="19" y="8" width="3" height="3" fill="#fef3c7" />
+            <rect x="11" y="9" width="1" height="1" fill="#1e293b" />
+            <rect x="20" y="9" width="1" height="1" fill="#1e293b" />
+          </g>
+        )}
+        {type === 'crab' && (
+          <g fill={color.main}>
+            {/* Body */}
+            <rect x="6" y="6" width="20" height="4" rx="1" />
+            <rect x="4" y="8" width="24" height="10" rx="1" />
+            <rect x="8" y="18" width="16" height="4" />
+            {/* Claws */}
+            <rect x="0" y="6" width="4" height="4" rx="1">
+              <animate attributeName="y" values="6;8;6" dur="0.4s" repeatCount="indefinite" />
+            </rect>
+            <rect x="0" y="10" width="4" height="4" rx="1" />
+            <rect x="28" y="6" width="4" height="4" rx="1">
+              <animate attributeName="y" values="6;8;6" dur="0.4s" repeatCount="indefinite" />
+            </rect>
+            <rect x="28" y="10" width="4" height="4" rx="1" />
+            {/* Legs */}
+            <rect x="6" y="20" width="3" height="6" rx="1">
+              <animate attributeName="height" values="6;4;6" dur="0.3s" repeatCount="indefinite" />
+            </rect>
+            <rect x="14" y="22" width="3" height="4" rx="1" />
+            <rect x="23" y="20" width="3" height="6" rx="1">
+              <animate attributeName="height" values="6;4;6" dur="0.3s" repeatCount="indefinite" />
+            </rect>
+            {/* Eyes */}
+            <rect x="10" y="10" width="3" height="3" fill="#fef3c7" />
+            <rect x="19" y="10" width="3" height="3" fill="#fef3c7" />
+            <rect x="11" y="11" width="1" height="1" fill="#1e293b" />
+            <rect x="20" y="11" width="1" height="1" fill="#1e293b" />
+          </g>
+        )}
+        {type === 'octopus' && (
+          <g fill={color.main}>
+            {/* Head dome */}
+            <rect x="8" y="2" width="16" height="4" rx="2" />
+            <rect x="4" y="4" width="24" height="10" rx="1" />
+            <rect x="6" y="14" width="20" height="4" />
+            {/* Tentacles */}
+            <rect x="4" y="16" width="4" height="6" rx="1">
+              <animate attributeName="x" values="4;2;4" dur="0.7s" repeatCount="indefinite" />
+            </rect>
+            <rect x="10" y="16" width="3" height="8" rx="1">
+              <animate attributeName="height" values="8;10;8" dur="0.5s" repeatCount="indefinite" />
+            </rect>
+            <rect x="15" y="16" width="3" height="6" rx="1" />
+            <rect x="20" y="16" width="3" height="8" rx="1">
+              <animate attributeName="height" values="8;10;8" dur="0.5s" repeatCount="indefinite" />
+            </rect>
+            <rect x="25" y="16" width="4" height="6" rx="1">
+              <animate attributeName="x" values="25;27;25" dur="0.7s" repeatCount="indefinite" />
+            </rect>
+            {/* Big eyes */}
+            <rect x="8" y="6" width="5" height="5" fill="#fef3c7" rx="1" />
+            <rect x="19" y="6" width="5" height="5" fill="#fef3c7" rx="1" />
+            <rect x="10" y="8" width="2" height="2" fill="#1e293b" />
+            <rect x="21" y="8" width="2" height="2" fill="#1e293b" />
+          </g>
+        )}
+      </svg>
+    </div>
+  );
+}
+
+// Glowing star component
+function GlowingStar({ x, y, size, color, delay, twinkleDuration }: {
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+  delay: number;
+  twinkleDuration: number;
+}) {
+  return (
+    <div
+      className="absolute rounded-full"
+      style={{
+        left: `${x}%`,
+        top: `${y}%`,
+        width: size,
+        height: size,
+        backgroundColor: color,
+        boxShadow: `0 0 ${size * 2}px ${size}px ${color}, 0 0 ${size * 4}px ${size * 2}px ${color}`,
+        animation: `twinkle ${twinkleDuration}s ease-in-out infinite`,
+        animationDelay: `${delay}s`,
+      }}
+    />
+  );
+}
+
+// Shooting star component
+function ShootingStar({ delay }: { delay: number }) {
+  const startX = useMemo(() => Math.random() * 60 + 20, []);
+  const startY = useMemo(() => Math.random() * 30, []);
+  
+  return (
+    <div
+      className="absolute w-1 h-1 bg-white rounded-full"
+      style={{
+        left: `${startX}%`,
+        top: `${startY}%`,
+        boxShadow: '0 0 4px 2px rgba(255,255,255,0.8), -20px 0 15px 2px rgba(255,255,255,0.4), -40px 0 10px 1px rgba(255,255,255,0.2)',
+        animation: `shootingStar 3s linear infinite`,
+        animationDelay: `${delay}s`,
+        opacity: 0,
+      }}
+    />
+  );
+}
+
 export function StartMenu({ gameState, onStartGame }: StartMenuProps) {
+  const [animationFrame, setAnimationFrame] = useState(0);
+
+  // Animate aliens frame switching
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAnimationFrame(f => (f + 1) % 2);
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Generate stars with different properties
+  const stars = useMemo(() => {
+    const starColors = [
+      'rgba(255, 255, 255, 0.9)',
+      'rgba(255, 255, 255, 0.7)',
+      'rgba(34, 211, 238, 0.8)', // cyan
+      'rgba(251, 146, 60, 0.7)', // orange
+      'rgba(244, 114, 182, 0.6)', // pink
+    ];
+
+    return Array.from({ length: 80 }).map((_, i) => ({
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: Math.random() > 0.9 ? 3 : Math.random() > 0.7 ? 2 : 1,
+      color: starColors[Math.floor(Math.random() * starColors.length)],
+      delay: Math.random() * 5,
+      twinkleDuration: 1.5 + Math.random() * 2,
+    }));
+  }, []);
+
+  // Generate floating aliens
+  const aliens = useMemo(() => {
+    const types: ('squid' | 'crab' | 'octopus')[] = ['squid', 'crab', 'octopus'];
+    return Array.from({ length: 12 }).map((_, i) => ({
+      type: types[i % 3],
+      x: Math.random() * 90 + 5,
+      y: Math.random() * 80 + 10,
+      size: 28 + Math.random() * 20,
+      animationDelay: Math.random() * 5,
+      duration: 8 + Math.random() * 6,
+    }));
+  }, []);
+
   return (
     <div className="fixed inset-0 z-50 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center overflow-hidden">
-      {/* Animated stars background */}
+      {/* CSS Keyframes */}
+      <style>{`
+        @keyframes twinkle {
+          0%, 100% { opacity: 0.3; transform: scale(0.8); }
+          50% { opacity: 1; transform: scale(1.2); }
+        }
+        @keyframes float {
+          0%, 100% { transform: translate(0, 0) rotate(0deg); }
+          25% { transform: translate(10px, -15px) rotate(3deg); }
+          50% { transform: translate(-5px, -25px) rotate(-2deg); }
+          75% { transform: translate(-15px, -10px) rotate(2deg); }
+        }
+        @keyframes bob {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+        @keyframes shootingStar {
+          0% { opacity: 0; transform: translate(0, 0); }
+          10% { opacity: 1; }
+          70% { opacity: 1; }
+          100% { opacity: 0; transform: translate(200px, 150px); }
+        }
+        @keyframes pulse-glow {
+          0%, 100% { filter: drop-shadow(0 0 10px currentColor); }
+          50% { filter: drop-shadow(0 0 20px currentColor) drop-shadow(0 0 30px currentColor); }
+        }
+      `}</style>
+
+      {/* Glowing stars background */}
       <div className="absolute inset-0 overflow-hidden">
-        {Array.from({ length: 50 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full bg-white animate-pulse"
-            style={{
-              width: Math.random() > 0.8 ? '3px' : '2px',
-              height: Math.random() > 0.8 ? '3px' : '2px',
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              opacity: 0.3 + Math.random() * 0.7,
-              animationDelay: `${Math.random() * 3}s`,
-              animationDuration: `${2 + Math.random() * 3}s`,
-            }}
-          />
+        {stars.map((star, i) => (
+          <GlowingStar key={i} {...star} />
+        ))}
+      </div>
+
+      {/* Shooting stars */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <ShootingStar delay={0} />
+        <ShootingStar delay={4} />
+        <ShootingStar delay={8} />
+      </div>
+
+      {/* Floating aliens */}
+      <div className="absolute inset-0 overflow-hidden">
+        {aliens.map((alien, i) => (
+          <AlienSprite key={i} {...alien} />
         ))}
       </div>
       
       {/* Decorative gradient orbs */}
-      <div className="absolute top-1/4 -left-32 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 -right-32 w-64 h-64 bg-orange-500/20 rounded-full blur-3xl" />
+      <div className="absolute top-1/4 -left-32 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-1/4 -right-32 w-64 h-64 bg-orange-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
       
-      <Card className="relative bg-slate-900/80 border-2 border-cyan-500/50 shadow-2xl shadow-cyan-500/20 backdrop-blur-sm max-w-lg mx-4">
+      {/* Nebula effect */}
+      <div className="absolute top-0 right-1/4 w-72 h-72 bg-gradient-to-br from-pink-500/10 to-transparent rounded-full blur-3xl" />
+      <div className="absolute bottom-1/3 left-1/4 w-48 h-48 bg-gradient-to-tr from-cyan-500/10 to-transparent rounded-full blur-2xl" />
+      
+      <Card className="relative bg-slate-900/80 border-2 border-cyan-500/50 shadow-2xl shadow-cyan-500/20 backdrop-blur-sm max-w-lg mx-4 z-10">
         <CardContent className="p-8 md:p-12 text-center">
           {/* Decorative top border glow */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
@@ -55,10 +299,10 @@ export function StartMenu({ gameState, onStartGame }: StartMenuProps) {
             <div className="mt-4 flex items-center justify-center gap-4">
               <div className="h-px flex-1 bg-gradient-to-r from-transparent to-cyan-500/50" />
               <div className="flex gap-2">
-                {/* Mini alien icons */}
-                <div className="w-4 h-3 bg-orange-400 rounded-sm" />
-                <div className="w-4 h-3 bg-rose-500 rounded-sm" />
-                <div className="w-4 h-3 bg-green-400 rounded-sm" />
+                {/* Mini alien icons with glow */}
+                <div className="w-4 h-3 bg-orange-400 rounded-sm shadow-lg shadow-orange-400/50" />
+                <div className="w-4 h-3 bg-rose-500 rounded-sm shadow-lg shadow-rose-500/50" />
+                <div className="w-4 h-3 bg-green-400 rounded-sm shadow-lg shadow-green-400/50" />
               </div>
               <div className="h-px flex-1 bg-gradient-to-l from-transparent to-cyan-500/50" />
             </div>

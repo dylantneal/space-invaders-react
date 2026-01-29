@@ -184,6 +184,8 @@ export function GameCanvas({ gameState, onGameStateChange, onBossDefeated }: Gam
     if (isBossWave(gameState.wave)) {
       // Boss wave - no regular aliens
       setAliens([]);
+      // Clear shields for boss wave - gives clear line of fire to boss
+      setShields([]);
       const newBoss = createBoss(gameState.wave);
       setBoss(newBoss);
       bossRef.current = newBoss;
@@ -275,7 +277,7 @@ export function GameCanvas({ gameState, onGameStateChange, onBossDefeated }: Gam
         rendererRef.current!.drawStars(stars);
         rendererRef.current!.drawShields(shields);
         rendererRef.current!.drawPlayer(player, hasShield(activePowerUps));
-        rendererRef.current!.drawAliens(aliens, soundManager.alienAnimationFrame);
+        rendererRef.current!.drawAliens(aliens, soundManager.alienAnimationFrame, gameState.wave);
         rendererRef.current!.drawBullets(bullets);
         rendererRef.current!.drawPowerUps(powerUps);
         
@@ -605,7 +607,17 @@ export function GameCanvas({ gameState, onGameStateChange, onBossDefeated }: Gam
       const filteredBullets = updateBullets(prevBullets);
       
       if (filteredBullets.length > GAME_CONFIG.MAX_BULLETS) {
-        return filteredBullets.slice(-GAME_CONFIG.MAX_BULLETS);
+        // Smart bullet trimming: keep player bullets and enemy bullets closest to player
+        const playerBullets = filteredBullets.filter(b => b.fromPlayer);
+        const enemyBullets = filteredBullets.filter(b => !b.fromPlayer);
+        
+        // Sort enemy bullets by Y position (descending) - keep ones closest to player
+        enemyBullets.sort((a, b) => b.y - a.y);
+        
+        const maxEnemyBullets = GAME_CONFIG.MAX_BULLETS - playerBullets.length;
+        const keptEnemyBullets = enemyBullets.slice(0, Math.max(0, maxEnemyBullets));
+        
+        return [...playerBullets, ...keptEnemyBullets];
       }
       
       return filteredBullets;
